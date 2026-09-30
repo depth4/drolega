@@ -1,10 +1,9 @@
 // Builds the flat's shell from layout.js: floors, walls with openings, wallpaper linings,
 // windows, interactive doors, balcony, ceiling, lamps and the night view outside.
 import * as THREE from 'three';
-import { H, ROOMS, WALLS, DIAG_WALLS, BALCONY, roomAt } from './layout.js';
+import { H, ROOMS, WALLS, DIAG_WALLS, BALCONY, CENTER, BOUNDS, roomAt } from './layout.js';
 import * as T from './textures.js';
 
-const CENTER = { x: 4.05, z: 2.75 };
 
 export const mat = (color, extra = {}) => new THREE.MeshStandardMaterial({ color, roughness: 0.85, ...extra });
 
@@ -48,7 +47,8 @@ export function buildApartment() {
   };
 
   // --- base slab (thresholds under door openings)
-  group.add(new THREE.Mesh(boxGeo(-0.4, 8.5, -0.25, 0, -0.42, 5.92), mat('#4a3f36')));
+  const B = BOUNDS;
+  group.add(new THREE.Mesh(boxGeo(B.x0, B.x1, -0.25, 0, B.z0, B.z1), mat('#4a3f36')));
 
   // --- floors
   const floorMats = {
@@ -149,7 +149,7 @@ export function buildApartment() {
   }
 
   // --- ceiling (faces down, so it is invisible from above anyway)
-  ceiling.add(new THREE.Mesh(new THREE.PlaneGeometry(8.9, 6.34).rotateX(Math.PI / 2).translate(4.05, H, 2.75), mat('#efece6')));
+  ceiling.add(new THREE.Mesh(new THREE.PlaneGeometry(B.x1 - B.x0, B.z1 - B.z0).rotateX(Math.PI / 2).translate((B.x0 + B.x1) / 2, H, (B.z0 + B.z1) / 2), mat('#efece6')));
 
   // --- lamps
   const bulbMat = new THREE.MeshBasicMaterial({ color: '#fff2d0' });
@@ -188,7 +188,7 @@ export function buildApartment() {
     group.add(new THREE.HemisphereLight('#8a94b8', '#2a2018', 0.25));
     // the rest of the building under the flat, so it doesn't float in the dollhouse view
     const mass = mat('#3a3834');
-    group.add(new THREE.Mesh(boxGeo(-0.4, 8.5, -9, -0.25, -0.42, 5.92), mass));
+    group.add(new THREE.Mesh(boxGeo(B.x0, B.x1, -9, -0.25, B.z0, B.z1), mass));
     // stairwell landing slab + mass (the landing is on the entrance side)
     const land = ROOMS.find((r) => r.id === 'landing').rects[0];
     group.add(new THREE.Mesh(boxGeo(land.x0 - 0.2, land.x1 + 0.2, -0.25, 0, land.z0 - 0.2, land.z1 + 0.2), mat('#4a3f36')));

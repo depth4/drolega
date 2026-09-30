@@ -339,7 +339,7 @@ function startWasted(f, g) {
 export class Friend extends Walker {
   constructor(game, id) {
     const def = CHARS[id];
-    super(game, makePerson({ ...def, style: game.style, faceId: id }), 1.4, true);
+    super(game, makePerson({ ...def, style: game.style, faceId: id }), 1.8, true);
     this.id = id;
     this.def = def;
     this.name = def.name;
@@ -602,7 +602,7 @@ export class Friend extends Walker {
 
 export class Cat extends Walker {
   constructor(game) {
-    super(game, makeCat(), 1.1, false);
+    super(game, makeCat(), 1.4, false);
     this.name = 'Кот';
     this.fun = TUNE.start.catFun;
     this.problem = null;

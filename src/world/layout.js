@@ -2,7 +2,7 @@
 // Single source of truth for geometry: rooms, walls, openings, furniture, gameplay spots, nav graph.
 //
 // Everything below is authored in PLAN coordinates (as on the BTI drawing, bedroom on the left),
-// then mirrored on export when MIRROR is true. Furniture uses the same trick (see mx / mrect).
+// then stretched by SCALE and mirrored on export. Furniture keeps its real size (see fitFurniture).
 // Run `npm run plan` to see the result as docs/plan.svg.
 //
 // Units: meters. Axes:
@@ -12,14 +12,22 @@
 // Origin: inner corner of the bedroom (room 2) at the window wall.
 
 export const MIRROR = true; // his flat is the mirror image of the drawing
-export const W = 8.1; // inner width, mirror axis is W / 2
-export const mx = (x) => (MIRROR ? W - x : x);
-export const mrect = (q) => (MIRROR ? { ...q, x0: W - q.x1, x1: W - q.x0 } : q);
+export const W = 8.1; // inner width on the drawing
+// The real-size flat felt cramped in first person, so the floor plan is stretched by SCALE:
+// rooms, walls, openings and routes grow, furniture keeps its real size and stays against its walls.
+export const SCALE = 1.35;
+const WS = W * SCALE; // mirror axis is WS / 2
+const sc = (v) => v * SCALE;
+// mx / mrect mirror an already-scaled plan x (furniture.js builds in scaled plan space)
+export const mx = (x) => (MIRROR ? WS - x : x);
+export const mrect = (q) => (MIRROR ? { ...q, x0: WS - q.x1, x1: WS - q.x0 } : q);
 export const mfacing = (f) => (MIRROR && f ? { '+x': '-x', '-x': '+x' }[f] ?? f : f);
-const mpt = ([x, z]) => [mx(x), z];
+const srect = (q) => ({ ...q, x0: sc(q.x0), x1: sc(q.x1), z0: sc(q.z0), z1: sc(q.z1) });
+const wrect = (q) => mrect(srect(q)); // plan rect -> world
+const wpt = ([x, z]) => [mx(sc(x)), sc(z)]; // plan point -> world
 
-export const H = 2.5; // ceiling height
-export const DOOR_H = 2.05;
+export const H = 2.7; // ceiling height (a bit higher than the real 2.5 so the stretched rooms don't feel low)
+export const DOOR_H = 2.1;
 
 const WIN = { bottom: 0.85, top: 2.2, kind: 'window' };
 const DOOR = { bottom: 0, top: DOOR_H, kind: 'door' };
@@ -153,17 +161,17 @@ export const NAV_EDGES = [
 
 // Spots where friends hang out: position, nav node to reach it from, pose, where to look.
 const PLAN_SPOTS = {
-  sofaA: { p: [2.95, 1.8], node: 'livingW', pose: 'sit', y: 0.08, look: [4, 1.8] },
-  sofaB: { p: [2.95, 2.6], node: 'livingW', pose: 'sit', y: 0.08, look: [4, 2.6] },
-  table1: { p: [4.6, 2.35], node: 'livingE', look: [4.0, 2.5] }, // keep arms out of the TV
-  table2: { p: [4.0, 3.5], node: 'living', look: [4.0, 2.6] },
+  sofaA: { on: 'sofa', p: [2.95, 1.8], node: 'livingW', pose: 'sit', y: 0.08, look: [4, 1.8] },
+  sofaB: { on: 'sofa', p: [2.95, 2.6], node: 'livingW', pose: 'sit', y: 0.08, look: [4, 2.6] },
+  table1: { on: 'partyTable', p: [4.6, 2.35], node: 'livingE', look: [4.0, 2.5] }, // keep arms out of the TV
+  table2: { on: 'partyTable', p: [4.0, 3.5], node: 'living', look: [4.0, 2.6] },
   balcony: { p: [3.6, -0.85], node: 'balcony', look: [3.6, -2] },
-  grill: { p: [4.6, -0.95], node: 'balcony', look: [5.2, -0.95] },
-  kitchen: { p: [6.6, 1.05], node: 'kitchen', look: [6.6, 0.3] },
-  tub: { p: [7.2, 2.39], node: 'bath', pose: 'lie', y: 0.2, look: [8.0, 2.39] },
-  toilet: { p: [7.62, 3.68], node: 'bath', pose: 'sit', look: [6.5, 3.68] },
+  grill: { on: 'grill', p: [4.6, -0.95], node: 'balcony', look: [5.2, -0.95] },
+  kitchen: { on: 'kitchenTable', p: [6.6, 1.05], node: 'kitchen', look: [6.6, 0.3] },
+  tub: { on: 'tub', p: [7.2, 2.39], node: 'bath', pose: 'lie', y: 0.2, look: [8.0, 2.39] },
+  toilet: { on: 'toilet', p: [7.62, 3.68], node: 'bath', pose: 'sit', look: [6.5, 3.68] },
   bathStand: { p: [6.2, 3.1], node: 'bath', look: [7, 3.1] },
-  olegBed: { p: [0.5, 1.95], node: 'bedroom', pose: 'lie', y: 0.47, look: [0.5, 3] }, // on top of the mattress
+  olegBed: { on: 'olegBed', p: [0.5, 1.95], node: 'bedroom', pose: 'lie', y: 0.47, look: [0.5, 3] }, // on top of the mattress
   bedroom: { p: [1.3, 3.6], node: 'bedroom', look: [1.3, 2] },
   hall: { p: [7.2, 4.6], node: 'hall', look: [6, 4.6] },
   hallWait: { p: [6.2, 4.6], node: 'hallW', look: [6.0, 3.8] },
@@ -171,10 +179,10 @@ const PLAN_SPOTS = {
 
 // The cat wanders between these (y = height it sits at). catBalcony only when the balcony door is open.
 const PLAN_CAT_SPOTS = {
-  catSofa: { p: [2.9, 2.9], node: 'livingW', y: 0.5 },
+  catSofa: { on: 'sofa', p: [2.9, 2.9], node: 'livingW', y: 0.5 },
   catRug: { p: [4.0, 4.3], node: 'living' },
   catKitchen: { p: [7.0, 1.1], node: 'kitchen' },
-  catBed: { p: [0.5, 2.6], node: 'bedroom', y: 0.5 },
+  catBed: { on: 'olegBed', p: [0.5, 2.6], node: 'bedroom', y: 0.5 },
   catBedroom: { p: [1.2, 4.2], node: 'bedroom' },
   catHall: { p: [7.6, 4.6], node: 'hall' },
   catBath: { p: [6.2, 3.3], node: 'bath' },
@@ -182,9 +190,10 @@ const PLAN_CAT_SPOTS = {
   catRail: { p: [4.2, -1.13], node: 'balcony', y: 1.0, balcony: true },
 };
 
-// Where the cat toy can be hidden (y = height, e.g. on a desk)
+// Where the cat toy can be hidden: [x, z, y (height), furniture it belongs to]
 const PLAN_TOY_SPOTS = [
-  [0.95, 2.4], [4.0, 2.6], [6.4, 0.4], [7.25, 3.98], [5.75, 5.35], [1.0, 4.95], [2.55, -1.0], [2.0, 1.5, 0.76], [3.4, 5.2], [7.9, 0.15],
+  [0.95, 2.4, 0, 'olegBed'], [4.0, 2.6, 0, 'partyTable'], [6.4, 0.4, 0, 'kitchenTable'], [7.25, 3.98, 0, 'toilet'], [5.75, 5.35],
+  [1.0, 4.95, 0, 'loftBed'], [2.55, -1.0], [2.0, 1.5, 0.76, 'sisterDesk'], [3.4, 5.2], [7.9, 0.15],
 ];
 
 // Paintings (the birthday pictures). Hung on a wall: x = wall face, facing = which way the picture looks.
@@ -200,42 +209,82 @@ const PLAN_DOORCAM = { pos: [10.45, 2.15, 4.95], look: [8.3, 1.2, 4.95] };
 // Where Oleg starts: in the hall by the front door, facing the living room.
 const PLAN_START = { x: 7.3, z: 4.6, yaw: Math.PI / 2 };
 
-// ---------- world-space exports (mirrored) ----------
+// ---------- world-space exports (scaled + mirrored) ----------
 
 const isAlongX = (w) => w.x1 - w.x0 >= w.z1 - w.z0;
+const inRect = (x, z, q) => x >= q.x0 && x <= q.x1 && z >= q.z0 && z <= q.z1;
+
+// Furniture keeps its real size. Whatever touched a wall on the drawing stays against that wall,
+// the rest keeps its (scaled) centre, so the extra space goes between things.
+function fitFurniture(f) {
+  const w = f.x1 - f.x0, d = f.z1 - f.z0;
+  const cx = (f.x0 + f.x1) / 2, cz = (f.z0 + f.z1) / 2;
+  const q = PLAN_ROOMS.flatMap((r) => r.rects).find((rr) => inRect(cx, cz, rr));
+  let x0 = sc(cx) - w / 2, z0 = sc(cz) - d / 2;
+  const near = 0.12;
+  if (q) {
+    if (f.x0 - q.x0 < near) x0 = sc(q.x0) + (f.x0 - q.x0);
+    else if (q.x1 - f.x1 < near) x0 = sc(q.x1) - (q.x1 - f.x1) - w;
+    if (f.z0 - q.z0 < near) z0 = sc(q.z0) + (f.z0 - q.z0);
+    else if (q.z1 - f.z1 < near) z0 = sc(q.z1) - (q.z1 - f.z1) - d;
+  }
+  return { ...f, x0, x1: x0 + w, z0, z1: z0 + d };
+}
+const FIT = Object.fromEntries(PLAN_FURNITURE.map((f) => [f.id, fitFurniture(f)]));
+
+// a point that belongs to a piece of furniture moves with it; anything else just scales
+function spotPoint([x, z], on) {
+  if (!on) return wpt([x, z]);
+  const f = PLAN_FURNITURE.find((it) => it.id === on), g = FIT[on];
+  return [mx((g.x0 + g.x1) / 2 + x - (f.x0 + f.x1) / 2), (g.z0 + g.z1) / 2 + z - (f.z0 + f.z1) / 2];
+}
 
 export const ROOMS = PLAN_ROOMS.map((room) => ({
   ...room,
-  rects: room.rects.map(mrect),
-  poly: room.poly?.map(mpt),
-  lamp: room.lamp && mpt(room.lamp),
+  rects: room.rects.map(wrect),
+  poly: room.poly?.map(wpt),
+  lamp: room.lamp && wpt(room.lamp),
 }));
 
 export const WALLS = PLAN_WALLS.map((w) => ({
   ...w,
-  ...mrect(w),
-  openings: (w.openings ?? []).map((o) => (MIRROR && isAlongX(w) ? { ...o, at: [W - o.at[1], W - o.at[0]] } : o)),
+  ...wrect(w),
+  openings: (w.openings ?? []).map((o) => {
+    const at = [sc(o.at[0]), sc(o.at[1])];
+    return { ...o, at: MIRROR && isAlongX(w) ? [WS - at[1], WS - at[0]] : at };
+  }),
 }));
 
-export const DIAG_WALLS = PLAN_DIAG_WALLS.map((d) => ({ ...d, a: mpt(d.a), b: mpt(d.b) }));
-export const BALCONY = mrect(PLAN_BALCONY);
-// world rect + facing for colliders/interaction; .plan keeps the drawing-space version for furniture.js
-export const FURNITURE = PLAN_FURNITURE.map((f) => ({ ...f, ...mrect(f), facing: mfacing(f.facing), plan: f }));
-export const NAV = Object.fromEntries(Object.entries(PLAN_NAV).map(([k, p]) => [k, mpt(p)]));
+export const DIAG_WALLS = PLAN_DIAG_WALLS.map((d) => ({
+  ...d,
+  a: wpt(d.a),
+  b: wpt(d.b),
+  t: sc(d.t),
+  door: { ...d.door, at: [sc(d.door.at[0]), sc(d.door.at[1])] },
+}));
+export const BALCONY = wrect(PLAN_BALCONY);
+// world rect + facing for colliders/interaction; .plan is the scaled drawing-space version for furniture.js
+export const FURNITURE = PLAN_FURNITURE.map((f) => ({ ...f, ...mrect(FIT[f.id]), facing: mfacing(f.facing), plan: FIT[f.id] }));
+export const NAV = Object.fromEntries(Object.entries(PLAN_NAV).map(([k, p]) => [k, wpt(p)]));
 export const SPOTS = Object.fromEntries(
-  Object.entries(PLAN_SPOTS).map(([k, s]) => [k, { ...s, id: k, p: mpt(s.p), look: mpt(s.look) }]),
+  Object.entries(PLAN_SPOTS).map(([k, s]) => [k, { ...s, id: k, p: spotPoint(s.p, s.on), look: spotPoint(s.look, s.on) }]),
 );
 export const CAT_SPOTS = Object.fromEntries(
-  Object.entries(PLAN_CAT_SPOTS).map(([k, s]) => [k, { ...s, id: k, p: mpt(s.p), y: s.y ?? 0 }]),
+  Object.entries(PLAN_CAT_SPOTS).map(([k, s]) => [k, { ...s, id: k, p: spotPoint(s.p, s.on), y: s.y ?? 0 }]),
 );
-export const TOY_SPOTS = PLAN_TOY_SPOTS.map(([x, z, y = 0]) => ({ p: [mx(x), z], y }));
-export const PAINTINGS = PLAN_PAINTINGS.map((p) => ({ ...p, x: mx(p.x), facing: mfacing(p.facing) }));
-export const VISITOR_SPOT = mpt(PLAN_VISITOR);
+export const TOY_SPOTS = PLAN_TOY_SPOTS.map(([x, z, y = 0, on]) => ({ p: spotPoint([x, z], on), y }));
+export const PAINTINGS = PLAN_PAINTINGS.map((p) => ({ ...p, x: mx(sc(p.x)), z: sc(p.z), facing: mfacing(p.facing) }));
+export const VISITOR_SPOT = wpt(PLAN_VISITOR);
 export const DOORCAM = {
-  pos: [mx(PLAN_DOORCAM.pos[0]), PLAN_DOORCAM.pos[1], PLAN_DOORCAM.pos[2]],
-  look: [mx(PLAN_DOORCAM.look[0]), PLAN_DOORCAM.look[1], PLAN_DOORCAM.look[2]],
+  pos: [mx(sc(PLAN_DOORCAM.pos[0])), PLAN_DOORCAM.pos[1], sc(PLAN_DOORCAM.pos[2])],
+  look: [mx(sc(PLAN_DOORCAM.look[0])), PLAN_DOORCAM.look[1], sc(PLAN_DOORCAM.look[2])],
 };
-export const START = { x: mx(PLAN_START.x), z: PLAN_START.z, yaw: MIRROR ? -PLAN_START.yaw : PLAN_START.yaw };
+const [startX, startZ] = wpt([PLAN_START.x, PLAN_START.z]);
+export const START = { x: startX, z: startZ, yaw: MIRROR ? -PLAN_START.yaw : PLAN_START.yaw };
+// middle of the flat in world coords (camera targets, "inside" checks)
+export const CENTER = { x: WS / 2, z: sc(2.75) };
+// outer bounds of the flat incl. exterior walls, world coords
+export const BOUNDS = { x0: sc(-0.4), x1: sc(8.5), z0: sc(-0.42), z1: sc(5.92) };
 
 function inPoly(x, z, poly) {
   let inside = false;

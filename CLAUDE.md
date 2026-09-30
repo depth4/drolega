@@ -11,7 +11,8 @@ Browser 3D game (three.js + Vite, vanilla JS), a birthday gift. FNAF × Who's Yo
 ## Map of the code
 
 - `src/world/layout.js` is the single source of truth for geometry: rooms, walls, openings, diagonal bath wall, furniture footprints, nav graph, friend and cat spots, toy hiding places, door camera.
-  - Everything is authored in **plan coordinates** (as on the BTI drawing) and mirrored on export (`MIRROR = true`). Never hand-mirror numbers.
+  - Everything is authored in **plan coordinates** (as on the BTI drawing), then stretched by `SCALE` (the real size felt cramped in first person) and mirrored on export (`MIRROR = true`). Never hand-mirror or hand-scale numbers.
+  - Furniture keeps its real size: whatever touches a wall on the drawing stays against it after scaling (`fitFurniture`). Spots with `on: '<furnitureId>'` move with that furniture.
   - +X is right on the drawing, +Z is down (away from the windows), meters.
 - `src/world/apartment.js` builds walls with openings, wallpaper linings (only where a wall face exists), floors, windows, and the hinged doors (`doors.balcony/bath/entrance`).
 - `src/world/furniture.js`: each item is built in a local frame (u along the wall, v from the wall to the front, y up). Colliders come from layout footprints.

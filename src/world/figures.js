@@ -35,7 +35,7 @@ export function textSprite(text, { bg = 'rgba(20,18,24,0.78)', fg = '#fff', size
 // Name tag, problem bubble and speech bubble shared by both character styles.
 function makeTags(root, name, label) {
   let nameTag = null, bubble = null, bubbleText = null, speech = null, speechLeft = 0;
-  let baseY = 1.88;
+  let baseY = 2.0;
   if (label) {
     nameTag = textSprite(name);
     root.add(nameTag);
@@ -135,18 +135,18 @@ function makeBoxPerson(opts) {
     const aspect = faceAspect(opts.faceId);
     const tex = faceTexture({ ...opts, skin, hair }, { w: 256, h: Math.round(256 / aspect), cutout: true });
     head = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, transparent: true, alphaTest: 0.1 }));
-    const hh = 0.3; // face photo with a little hair/beanie around it
+    const hh = 0.5; // big on purpose: the faces are the point
     head.scale.set(hh * aspect, hh, 1);
     head.center.set(0.5, 0);
-    head.position.y = 0.57;
+    head.position.y = 0.55;
     hips.add(head);
   } else {
     // cube head: face on the front (+z), hair on top and back
     const face = new THREE.MeshStandardMaterial({ map: faceTexture({ ...opts, skin, hair }), roughness: 0.8 });
     const h = sk?.head;
     const mats = h ? [h.sides[0], h.sides[1], h.top, m.skin, h.front, h.back] : [m.skin, m.skin, m.hair, m.skin, face, m.hair];
-    head = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.26, 0.23).translate(0, 0.14, 0), mats);
-    head.position.y = 0.58;
+    head = new THREE.Mesh(new THREE.BoxGeometry(0.32, 0.36, 0.3).translate(0, 0.2, 0), mats);
+    head.position.y = 0.56;
     hips.add(head);
   }
 
@@ -156,10 +156,10 @@ function makeBoxPerson(opts) {
     const aspect = faceAspect(opts.drinkFaceId);
     const tex = faceTexture({ ...opts, faceId: opts.drinkFaceId, skin, hair }, { w: 384, h: Math.round(384 / aspect), cutout: true });
     drink = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, transparent: true, alphaTest: 0.1 }));
-    const dh = 0.45; // a bit bigger than the normal head: bottle and hand are in frame
+    const dh = 0.72; // a bit bigger than the normal head: bottle and hand are in frame
     drink.scale.set(dh * aspect, dh, 1);
     drink.center.set(0.71, 0); // his head sits right of centre in the photo, the bottle sticks out left
-    drink.position.y = 0.42;
+    drink.position.y = 0.34;
     drink.visible = false;
     hips.add(drink);
   }
@@ -193,7 +193,7 @@ function makeBoxPerson(opts) {
         body.position.y = y + 0.12;
         body.position.z = 0.85;
       }
-      tags.setY(p === 'lie' ? 1.0 + y : p === 'sit' ? 1.48 + y : 1.88);
+      tags.setY(p === 'lie' ? 1.1 + y : p === 'sit' ? 1.6 + y : 2.0);
     },
     animate(t, walking, extra = 0, dt = 0) {
       tags.tick(dt);

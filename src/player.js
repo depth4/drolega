@@ -51,7 +51,7 @@ export class Player {
     const d = drunk / 100;
     const moving = f || s;
     if (moving) {
-      const speed = k.has('ShiftLeft') || k.has('ShiftRight') ? 4.2 : 2.6;
+      const speed = k.has('ShiftLeft') || k.has('ShiftRight') ? 5.0 : 3.1;
       const sin = Math.sin(this.yaw), cos = Math.cos(this.yaw);
       let dx = -sin * f + cos * s, dz = -cos * f - sin * s;
       const len = Math.hypot(dx, dz);
@@ -64,7 +64,7 @@ export class Player {
       const step = speed * dt;
       if (!this.blocked(this.x + dx * step, this.z)) this.x += dx * step;
       if (!this.blocked(this.x, this.z + dz * step)) this.z += dz * step;
-      this.walkT += dt * (speed / 2.6);
+      this.walkT += dt * (speed / 3.1);
     }
     const bob = moving ? Math.sin(this.walkT * 8) * 0.03 : 0;
     const sway = d * d;

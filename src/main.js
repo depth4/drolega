@@ -3,7 +3,7 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { buildApartment } from './world/apartment.js';
 import { buildFurniture } from './world/furniture.js';
-import { roomAt, START, DOORCAM, SPOTS } from './world/layout.js';
+import { roomAt, START, DOORCAM, SPOTS, CENTER } from './world/layout.js';
 import { Game } from './game/game.js';
 import { Player } from './player.js';
 import { makeFX } from './fx.js';
@@ -45,7 +45,7 @@ window.__player = player;
 window.__spots = SPOTS;
 
 const orbit = new OrbitControls(orbitCam, canvas);
-orbit.target.set(4.05, 0, 2.4);
+orbit.target.set(CENTER.x, 0, CENTER.z);
 orbit.enableDamping = true;
 orbit.enabled = false;
 
@@ -110,8 +110,8 @@ function toOrbit() {
   orbit.enabled = true;
   apt.ceiling.visible = false;
   if (params.get('view') === 'top') {
-    orbitCam.position.set(4.05, 13, 2.45);
-  } else orbitCam.position.set(4.05, 9, 11);
+    orbitCam.position.set(CENTER.x, 17, CENTER.z);
+  } else orbitCam.position.set(CENTER.x, 12, CENTER.z + 11);
   orbitCam.lookAt(orbit.target);
 }
 

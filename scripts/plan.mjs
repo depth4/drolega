@@ -1,10 +1,10 @@
 // Draws a 2D plan straight from src/world/layout.js, so the schematic always matches the game.
 // Usage: npm run plan  ->  docs/plan.svg
 import { writeFileSync, mkdirSync } from 'node:fs';
-import { ROOMS, WALLS, DIAG_WALLS, BALCONY, FURNITURE, START, MIRROR, mx } from '../src/world/layout.js';
+import { ROOMS, WALLS, DIAG_WALLS, BALCONY, FURNITURE, START, MIRROR, SCALE, mx } from '../src/world/layout.js';
 
-const S = 110; // px per meter
-const minX = -3.0, minZ = -1.6, maxX = 9.1, maxZ = 6.8;
+const S = 110 / SCALE; // px per meter (the plan is stretched by SCALE, keep the picture the same size)
+const minX = -3.0 * SCALE, minZ = -1.6 * SCALE, maxX = 9.1 * SCALE, maxZ = 6.8 * SCALE;
 const X = (x) => ((x - minX) * S).toFixed(1);
 const Z = (z) => ((z - minZ) * S + 60).toFixed(1);
 const width = (maxX - minX) * S, height = (maxZ - minZ) * S + 60;
@@ -92,8 +92,8 @@ for (const f of FURNITURE) {
   text(cx, cz + 0.04, shortLabel[f.id] ?? f.label, `font-size="11" text-anchor="middle" fill="${f.onTop ? '#0b3d7a' : '#333'}" ${tr}`);
 }
 for (const room of ROOMS) {
-  const [px, cz] = roomLabelAt[room.id];
-  const cx = mx(px);
+  const [px, pz] = roomLabelAt[room.id];
+  const cx = mx(px * SCALE), cz = pz * SCALE;
   text(cx, cz, room.name, 'font-size="16" font-weight="bold" text-anchor="middle" fill="#1d1b19"');
   text(cx, cz + 0.24, `≈${area(room).toFixed(1)} м²`, 'font-size="12" text-anchor="middle" fill="#555"');
 }
@@ -101,16 +101,17 @@ for (const room of ROOMS) {
 // Oleg start + entrance marker
 const ex = WALLS.find((w) => w.id === 'east');
 const entX = (ex.x0 + ex.x1) / 2 + (ex.x0 < 1 ? -0.7 : 0.7);
-text(entX, 5.0, 'ВХОД', `font-size="13" font-weight="bold" text-anchor="middle" fill="#8a4a2a"`);
+text(entX, 5.0 * SCALE, 'ВХОД', `font-size="13" font-weight="bold" text-anchor="middle" fill="#8a4a2a"`);
 const fx = -Math.sin(START.yaw) * 0.45, fz = -Math.cos(START.yaw) * 0.45;
 add(`<circle cx="${X(START.x)}" cy="${Z(START.z)}" r="9" fill="#d9822b"/>`);
 add(`<line x1="${X(START.x)}" y1="${Z(START.z)}" x2="${X(START.x + fx)}" y2="${Z(START.z + fz)}" stroke="#d9822b" stroke-width="3"/>`);
 text(START.x, START.z + 0.32, 'Олег', 'font-size="11" text-anchor="middle" fill="#a0561a"');
 
 // scale bar
-add(`<line x1="${X(0)}" y1="${Z(6.25)}" x2="${X(1)}" y2="${Z(6.25)}" stroke="#333" stroke-width="2"/>`);
-text(0.5, 6.18, '1 м', 'font-size="11" text-anchor="middle" fill="#333"');
-text(1.4, 6.3, 'окна — голубые · балконная дверь — пунктир · синее с пунктиром — стоит сверху', 'font-size="11" fill="#555"');
+const sy = 6.25 * SCALE;
+add(`<line x1="${X(0)}" y1="${Z(sy)}" x2="${X(1)}" y2="${Z(sy)}" stroke="#333" stroke-width="2"/>`);
+text(0.5, sy - 0.07, '1 м', 'font-size="11" text-anchor="middle" fill="#333"');
+text(1.4, sy + 0.05, `масштаб ×${SCALE} к реальному · окна — голубые · балконная дверь — пунктир · синее с пунктиром — стоит сверху`, 'font-size="11" fill="#555"');
 add('</svg>');
 
 mkdirSync(new URL('../docs/', import.meta.url), { recursive: true });

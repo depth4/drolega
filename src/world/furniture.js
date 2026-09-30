@@ -312,7 +312,9 @@ export function buildFurniture() {
   if (living) chandelier(group, living.lamp);
 
   // floor rug in the living room
-  const [rx0, rx1] = [mx(3.35), mx(4.85)].sort((a, b) => a - b);
-  group.add(new THREE.Mesh(boxGeo(rx0, rx1, 0.003, 0.012, 1.5, 4.3), new THREE.MeshStandardMaterial({ map: T.floorRug(), roughness: 1 })));
+  // real-size rug centred under the party table
+  const t = FURNITURE.find((f) => f.id === 'partyTable');
+  const [cx, cz] = [(t.x0 + t.x1) / 2, (t.z0 + t.z1) / 2];
+  group.add(new THREE.Mesh(boxGeo(cx - 0.75, cx + 0.75, 0.003, 0.012, cz - 1.4, cz + 1.4), new THREE.MeshStandardMaterial({ map: T.floorRug(), roughness: 1 })));
   return { group, items, colliders };
 }
