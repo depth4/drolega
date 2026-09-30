@@ -35,7 +35,7 @@ export function textSprite(text, { bg = 'rgba(20,18,24,0.78)', fg = '#fff', size
 // Name tag, problem bubble and speech bubble shared by both character styles.
 function makeTags(root, name, label) {
   let nameTag = null, bubble = null, bubbleText = null, speech = null, speechLeft = 0;
-  let baseY = 1.95;
+  let baseY = 1.88;
   if (label) {
     nameTag = textSprite(name);
     root.add(nameTag);
@@ -108,23 +108,24 @@ function makeBoxPerson(opts) {
   const sk = skinMaterials(opts.faceId); // clothes from a skin sheet, if this guy has one
 
   const hips = new THREE.Group();
-  hips.position.y = 0.82;
+  // real-life proportions: ~1.75 m tall, ~48 cm across the shoulders, head ~23 cm
+  hips.position.y = 0.86;
   body.add(hips);
   const legs = new THREE.Group();
   hips.add(legs);
-  for (const [i, x] of [-0.09, 0.09].entries()) {
-    const leg = new THREE.Mesh(new THREE.BoxGeometry(0.13, 0.82, 0.15).translate(0, -0.41, 0), sk?.legs[i] ?? m.pants);
+  for (const [i, x] of [-0.07, 0.07].entries()) {
+    const leg = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.86, 0.14).translate(0, -0.43, 0), sk?.legs[i] ?? m.pants);
     leg.position.x = x;
     legs.add(leg);
   }
-  const torso = new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.62, 0.26).translate(0, 0.31, 0), sk?.torso ?? m.shirt);
+  const torso = new THREE.Mesh(new THREE.BoxGeometry(0.36, 0.56, 0.21).translate(0, 0.28, 0), sk?.torso ?? m.shirt);
   hips.add(torso);
   const arms = [];
   for (const side of [-1, 1]) {
     const arm = new THREE.Group();
-    arm.position.set(side * 0.27, 0.58, 0);
-    arm.add(new THREE.Mesh(new THREE.BoxGeometry(0.11, 0.6, 0.13).translate(0, -0.3, 0), sk?.arm ?? m.shirt));
-    arm.add(new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.1, 0.1).translate(0, -0.64, 0), m.skin));
+    arm.position.set(side * 0.225, 0.54, 0);
+    arm.add(new THREE.Mesh(new THREE.BoxGeometry(0.09, 0.56, 0.1).translate(0, -0.28, 0), sk?.arm ?? m.shirt));
+    arm.add(new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.08, 0.08).translate(0, -0.6, 0), m.skin));
     hips.add(arm);
     arms.push(arm);
   }
@@ -134,18 +135,18 @@ function makeBoxPerson(opts) {
     const aspect = faceAspect(opts.faceId);
     const tex = faceTexture({ ...opts, skin, hair }, { w: 256, h: Math.round(256 / aspect), cutout: true });
     head = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, transparent: true, alphaTest: 0.1 }));
-    const hh = 0.5;
+    const hh = 0.3; // face photo with a little hair/beanie around it
     head.scale.set(hh * aspect, hh, 1);
     head.center.set(0.5, 0);
-    head.position.y = 0.6;
+    head.position.y = 0.57;
     hips.add(head);
   } else {
     // cube head: face on the front (+z), hair on top and back
     const face = new THREE.MeshStandardMaterial({ map: faceTexture({ ...opts, skin, hair }), roughness: 0.8 });
     const h = sk?.head;
     const mats = h ? [h.sides[0], h.sides[1], h.top, m.skin, h.front, h.back] : [m.skin, m.skin, m.hair, m.skin, face, m.hair];
-    head = new THREE.Mesh(new THREE.BoxGeometry(0.32, 0.36, 0.3).translate(0, 0.2, 0), mats);
-    head.position.y = 0.64;
+    head = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.26, 0.23).translate(0, 0.14, 0), mats);
+    head.position.y = 0.58;
     hips.add(head);
   }
 
@@ -155,10 +156,10 @@ function makeBoxPerson(opts) {
     const aspect = faceAspect(opts.drinkFaceId);
     const tex = faceTexture({ ...opts, faceId: opts.drinkFaceId, skin, hair }, { w: 384, h: Math.round(384 / aspect), cutout: true });
     drink = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, transparent: true, alphaTest: 0.1 }));
-    const dh = 0.72; // a bit bigger than the normal head
+    const dh = 0.45; // a bit bigger than the normal head: bottle and hand are in frame
     drink.scale.set(dh * aspect, dh, 1);
     drink.center.set(0.71, 0); // his head sits right of centre in the photo, the bottle sticks out left
-    drink.position.y = 0.4;
+    drink.position.y = 0.42;
     drink.visible = false;
     hips.add(drink);
   }
@@ -185,14 +186,14 @@ function makeBoxPerson(opts) {
       legs.rotation.x = 0;
       arms.forEach((a) => (a.rotation.x = 0));
       if (p === 'sit') {
-        body.position.y = -0.37 + y;
+        body.position.y = -0.41 + y;
         legs.rotation.x = -Math.PI / 2;
       } else if (p === 'lie') {
         body.rotation.x = -Math.PI / 2;
-        body.position.y = y + 0.14;
-        body.position.z = 0.8;
+        body.position.y = y + 0.12;
+        body.position.z = 0.85;
       }
-      tags.setY(p === 'lie' ? 1.1 + y : p === 'sit' ? 1.6 + y : 1.95);
+      tags.setY(p === 'lie' ? 1.0 + y : p === 'sit' ? 1.48 + y : 1.88);
     },
     animate(t, walking, extra = 0, dt = 0) {
       tags.tick(dt);
