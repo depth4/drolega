@@ -143,7 +143,7 @@ $('btn-play').addEventListener('click', play);
 $('btn-orbit').addEventListener('click', toOrbit);
 
 // character look: cube heads with photo faces, or Doom-style pixel sprites
-const STYLE_NAMES = { box: 'Бошки: кубы', sprite: 'Бошки: спрайты (как в Doom)' };
+const STYLE_NAMES = { box: 'Бошки: кубы', sprite: 'Бошки: плоские (как в Doom)' };
 function setStyle(style) {
   game.restyle(style);
   $('btn-style').textContent = STYLE_NAMES[style];

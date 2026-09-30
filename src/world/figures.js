@@ -2,7 +2,7 @@
 // People face local +z (Object3D.lookAt points +z at the target).
 import * as THREE from 'three';
 import { mat } from './apartment.js';
-import { drawFace } from './faces.js';
+import { drawFace, faceAspect } from './faces.js';
 
 export function textSprite(text, { bg = 'rgba(20,18,24,0.78)', fg = '#fff', size = 40, scale = 0.001 } = {}) {
   const c = document.createElement('canvas');
@@ -81,17 +81,19 @@ function makeTags(root, name, label) {
   };
 }
 
-// style: 'box' — low-poly body with a cube head (photo on the front); 'sprite' — flat Doom-style billboard
+// Low-poly body; the head is either a cube with the face on the front (style 'box')
+// or a flat Doom-style billboard that always faces you (style 'sprite')
 export function makePerson(opts) {
-  return opts.style === 'sprite' ? makeSpritePerson(opts) : makeBoxPerson(opts);
+  return makeBoxPerson(opts);
 }
 
-function faceTexture(opts, size = 128) {
+function faceTexture(opts, { w = 128, h = 128, cutout = false } = {}) {
   const c = document.createElement('canvas');
-  c.width = c.height = size;
+  c.width = w;
+  c.height = h;
   const tex = new THREE.CanvasTexture(c);
   tex.colorSpace = THREE.SRGBColorSpace;
-  drawFace(c.getContext('2d'), opts.faceId, opts, 0, 0, size, size, () => (tex.needsUpdate = true));
+  drawFace(c.getContext('2d'), opts.faceId, opts, 0, 0, w, h, () => (tex.needsUpdate = true), { cutout });
   return tex;
 }
 
@@ -123,11 +125,23 @@ function makeBoxPerson(opts) {
     hips.add(arm);
     arms.push(arm);
   }
-  // cube head: face on the front (+z), hair on top and back
-  const face = new THREE.MeshStandardMaterial({ map: faceTexture({ ...opts, skin, hair }), roughness: 0.8 });
-  const head = new THREE.Mesh(new THREE.BoxGeometry(0.32, 0.36, 0.3).translate(0, 0.2, 0), [m.skin, m.skin, m.hair, m.skin, face, m.hair]);
-  head.position.y = 0.64;
-  hips.add(head);
+  if (opts.style === 'sprite') {
+    // Doom-style head: a flat cut-out face that always turns to the camera
+    const aspect = faceAspect(opts.faceId);
+    const tex = faceTexture({ ...opts, skin, hair }, { w: 256, h: Math.round(256 / aspect), cutout: true });
+    const head = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, transparent: true, alphaTest: 0.1 }));
+    const hh = 0.5;
+    head.scale.set(hh * aspect, hh, 1);
+    head.center.set(0.5, 0);
+    head.position.y = 0.6;
+    hips.add(head);
+  } else {
+    // cube head: face on the front (+z), hair on top and back
+    const face = new THREE.MeshStandardMaterial({ map: faceTexture({ ...opts, skin, hair }), roughness: 0.8 });
+    const head = new THREE.Mesh(new THREE.BoxGeometry(0.32, 0.36, 0.3).translate(0, 0.2, 0), [m.skin, m.skin, m.hair, m.skin, face, m.hair]);
+    head.position.y = 0.64;
+    hips.add(head);
+  }
 
   const tags = makeTags(root, name, label);
   let pose = 'stand';
@@ -164,92 +178,6 @@ function makeBoxPerson(opts) {
         body.position.y = 0;
       }
       if (pose !== 'lie') hips.rotation.z = Math.sin(t * 1.7) * (0.02 + extra * 0.12);
-    },
-    get pose() {
-      return pose;
-    },
-  };
-}
-
-// Doom-style: one pixelated billboard, two walk frames, face photo squashed into ~16 px
-function makeSpritePerson(opts) {
-  const { name, shirt, pants = '#2b2f3a', skin = '#e2b594', hair = '#3b2a1e', label = true } = opts;
-  const W = 32, Hh = 64;
-  const frames = [0, 1].map((frame) => {
-    const c = document.createElement('canvas');
-    c.width = W;
-    c.height = Hh;
-    const tex = new THREE.CanvasTexture(c);
-    tex.magFilter = tex.minFilter = THREE.NearestFilter;
-    tex.generateMipmaps = false;
-    tex.colorSpace = THREE.SRGBColorSpace;
-    const g = c.getContext('2d');
-    const paint = () => {
-      g.clearRect(0, 0, W, Hh);
-      // legs
-      g.fillStyle = pants;
-      if (frame === 0) {
-        g.fillRect(10, 38, 5, 24);
-        g.fillRect(17, 38, 5, 24);
-      } else {
-        g.fillRect(8, 38, 5, 24);
-        g.fillRect(19, 38, 5, 24);
-      }
-      g.fillStyle = '#1a1a1a';
-      g.fillRect(frame ? 7 : 9, 61, 7, 3);
-      g.fillRect(frame ? 18 : 16, 61, 7, 3);
-      // torso + arms
-      g.fillStyle = shirt;
-      g.fillRect(8, 19, 16, 21);
-      g.fillRect(4, 20, 4, 15 + (frame ? 2 : 0));
-      g.fillRect(24, 20, 4, 15 + (frame ? 0 : 2));
-      g.fillStyle = skin;
-      g.fillRect(4, 35 + (frame ? 2 : 0), 4, 3);
-      g.fillRect(24, 35 + (frame ? 0 : 2), 4, 3);
-      g.fillStyle = 'rgba(0,0,0,0.25)';
-      g.fillRect(8, 36, 16, 4);
-      // head: tiny canvas first, so the photo turns into chunky pixels
-      const hc = document.createElement('canvas');
-      hc.width = 16;
-      hc.height = 18;
-      drawFace(hc.getContext('2d'), opts.faceId, { skin, hair }, 0, 0, 16, 18);
-      g.drawImage(hc, 8, 1);
-      tex.needsUpdate = true;
-    };
-    paint();
-    drawFace(document.createElement('canvas').getContext('2d'), opts.faceId, { skin, hair }, 0, 0, 1, 1, paint);
-    return tex;
-  });
-  const material = new THREE.SpriteMaterial({ map: frames[0], transparent: true, alphaTest: 0.5 });
-  const sprite = new THREE.Sprite(material);
-  sprite.center.set(0.5, 0);
-  sprite.scale.set(0.875, 1.75, 1);
-  const root = new THREE.Group();
-  root.add(sprite);
-  const tags = makeTags(root, name, label);
-  let pose = 'stand';
-  return {
-    root, body: sprite, arms: [], ...tags,
-    setPose(p, y = 0) {
-      pose = p;
-      material.rotation = 0;
-      sprite.center.set(0.5, 0);
-      sprite.scale.set(0.875, 1.75, 1);
-      sprite.position.set(0, y, 0);
-      if (p === 'sit') {
-        sprite.scale.set(0.875, 1.35, 1);
-        sprite.position.y = y + 0.1;
-      } else if (p === 'lie') {
-        material.rotation = Math.PI / 2;
-        sprite.center.set(0.5, 0.5);
-        sprite.position.y = y + 0.3;
-      }
-      tags.setY(p === 'lie' ? 1.1 + y : p === 'sit' ? 1.6 + y : 1.95);
-    },
-    animate(t, walking, extra = 0, dt = 0) {
-      tags.tick(dt);
-      material.map = frames[walking && Math.sin(t * 9) > 0 ? 1 : 0];
-      if (pose === 'stand') material.rotation = Math.sin(t * 1.7) * (0.01 + extra * 0.08);
     },
     get pose() {
       return pose;

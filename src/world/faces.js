@@ -3,7 +3,7 @@
 import kirill from '../assets/faces/kirill.png?inline';
 
 const PHOTOS = {
-  kirill: { src: kirill, crop: [0.16, 0.0, 0.74, 0.8] },
+  kirill: { src: kirill, crop: [0.16, 0.0, 0.74, 0.8], w: 449, h: 600 },
 };
 
 const cache = {};
@@ -22,8 +22,17 @@ function loadPhoto(id) {
   return cache[id];
 }
 
+// width / height of the face picture (photo crop), for sizing billboard heads
+export function faceAspect(id) {
+  const p = PHOTOS[id];
+  if (!p) return 0.8;
+  const [, , cw, ch] = p.crop;
+  return (cw * (p.w ?? 1)) / (ch * (p.h ?? 1));
+}
+
 // Draws the face into ctx at (x, y, w, h). Calls onReady again when a photo finishes loading.
-export function drawFace(ctx, id, { skin, hair }, x, y, w, h, onReady) {
+// cutout: keep the photo's transparent background (billboard heads) instead of filling it.
+export function drawFace(ctx, id, { skin, hair }, x, y, w, h, onReady, { cutout = false } = {}) {
   const photo = loadPhoto(id);
   const draw = () => {
     if (photo?.ready) {
@@ -31,6 +40,7 @@ export function drawFace(ctx, id, { skin, hair }, x, y, w, h, onReady) {
       const { naturalWidth: iw, naturalHeight: ih } = photo.img;
       ctx.clearRect(x, y, w, h);
       ctx.drawImage(photo.img, cx * iw, cy * ih, cw * iw, ch * ih, x, y, w, h);
+      if (cutout) return;
       // cut-out photo: fill the see-through / whitish background with the hair colour
       const [hr, hg, hb] = [1, 3, 5].map((i) => parseInt(hair.slice(i, i + 2), 16));
       const px = ctx.getImageData(x, y, w, h);
@@ -50,6 +60,14 @@ export function drawFace(ctx, id, { skin, hair }, x, y, w, h, onReady) {
     // placeholder: skin, hair fringe, eyes, brows, mouth
     const u = w / 16, v = h / 16;
     ctx.fillStyle = skin;
+    if (cutout) {
+      // oval head on a transparent background
+      ctx.clearRect(x, y, w, h);
+      ctx.save();
+      ctx.beginPath();
+      ctx.ellipse(x + w / 2, y + h / 2, w * 0.46, h * 0.48, 0, 0, Math.PI * 2);
+      ctx.clip();
+    }
     ctx.fillRect(x, y, w, h);
     ctx.fillStyle = hair;
     ctx.fillRect(x, y, w, v * 4);
@@ -62,6 +80,7 @@ export function drawFace(ctx, id, { skin, hair }, x, y, w, h, onReady) {
     ctx.fillRect(x + u * 9, y + v * 5, u * 4, v * 0.8);
     ctx.fillStyle = '#b86a5a';
     ctx.fillRect(x + u * 5, y + v * 11.5, u * 6, v * 1.2);
+    if (cutout) ctx.restore();
   };
   draw();
   if (photo && !photo.ready) photo.waiters.push(() => (draw(), onReady?.()));
