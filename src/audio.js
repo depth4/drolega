@@ -1,8 +1,61 @@
 // Sounds are synthesized with WebAudio; the only recordings are the guys' voices. Call init() from a click.
-import temych from './assets/voice/temych.mp3?inline';
 
-const VOICES = { temych };
-const playing = {};
+// ---------- recorded voices: src/assets/voice/<who>_<kind>_<n>.mp3 ----------
+// kinds: monolog, booze (reaction to a drink), cough, quote, vapeloop; who = event for non-attributed ones.
+const FILES = import.meta.glob('./assets/voice/*.mp3', { eager: true, query: '?inline', import: 'default' });
+const CLIPS = {}; // 'temych_cough' -> [src, ...]
+for (const [path, src] of Object.entries(FILES)) {
+  const m = path.match(/\/([a-z]+_[a-z]+?)(?:_\d+)?\.mp3$/);
+  if (m) (CLIPS[m[1]] ??= []).push(src);
+}
+const active = new Set();
+let listener = [0, 0];
+const falloff = (pos) => {
+  if (!pos) return 1;
+  const [x, z] = typeof pos === 'function' ? pos() : pos;
+  const d = Math.hypot(x - listener[0], z - listener[1]);
+  return d < 1.5 ? 1 : Math.max(0.1, 1 - (d - 1.5) / 8);
+};
+
+export const voices = {
+  has: (key) => !!CLIPS[key]?.length,
+  // play a random clip of `key` ('lyokha_booze'); pos = [x, z] or () => [x, z] for distance volume
+  play(key, { pos = null, gain = 1, loop = false } = {}) {
+    const list = CLIPS[key];
+    if (!ctx || !list?.length) return null;
+    const a = new Audio(list[Math.floor(Math.random() * list.length)]);
+    const h = {
+      key, audio: a, pos, gain,
+      get playing() {
+        return !a.ended && !a.paused;
+      },
+      stop() {
+        a.pause();
+        active.delete(h);
+      },
+    };
+    a.loop = loop;
+    a.volume = Math.min(1, gain * falloff(pos));
+    a.addEventListener('ended', () => active.delete(h));
+    a.play().catch(() => active.delete(h));
+    active.add(h);
+    return h;
+  },
+  // how many clips whose key matches `re` are playing right now
+  count(re) {
+    let n = 0;
+    for (const h of active) if (re.test(h.key) && h.playing) n++;
+    return n;
+  },
+  update(pos) {
+    listener = pos;
+    for (const h of active) h.audio.volume = Math.min(1, h.gain * falloff(h.pos));
+  },
+  stopAll() {
+    for (const h of [...active]) h.stop();
+  },
+};
+
 let ctx = null;
 let master = null;
 let musicTimer = null;
@@ -63,13 +116,6 @@ export const sfx = {
   whoosh: () => noise(0.4, { vol: 0.4, freq: 900, q: 0.4 }),
   fix: () => [0, 0.15, 0.3].forEach((w) => tone(1200, 0.05, { vol: 0.08, when: w })),
   click: () => tone(1500, 0.03, { vol: 0.05 }),
-  voice(id, volume = 1) {
-    if (!ctx || !VOICES[id] || playing[id] && !playing[id].ended) return;
-    const a = new Audio(VOICES[id]);
-    a.volume = Math.max(0, Math.min(1, volume));
-    a.play().catch(() => {});
-    playing[id] = a;
-  },
 };
 
 // Party music: a dumb 4-chord loop with a kick. Plays while the stereo is on.

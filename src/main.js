@@ -36,7 +36,7 @@ const apt = buildApartment();
 const furn = buildFurniture();
 scene.add(apt.group, furn.group);
 
-const game = new Game({ scene, apt, furn, sfx: audio.sfx });
+const game = new Game({ scene, apt, furn, sfx: audio.sfx, voices: audio.voices });
 const player = new Player(camera, [...apt.colliders, ...furn.colliders]);
 const fx = makeFX(renderer, scene, camera);
 const hud = createHUD({ onBuy: (id) => game.buy(id) });
@@ -175,7 +175,7 @@ document.addEventListener('pointerlockchange', () => {
 });
 document.addEventListener('mousemove', (e) => {
   if (mode !== 'play' || phoneOpen) return;
-  if (locked || dragging) player.look(e.movementX, e.movementY);
+  if ((locked || dragging) && !game.talkLocked) player.look(e.movementX, e.movementY);
 });
 canvas.addEventListener('mousedown', () => {
   if (mode === 'play' && !locked && !phoneOpen) dragging = true;
@@ -191,7 +191,7 @@ addEventListener('keydown', (e) => {
   const k = e.code;
   if (k === 'KeyF') return setPhone(!phoneOpen);
   if (k === 'Escape') return phoneOpen ? setPhone(false) : pause();
-  if (phoneOpen || game.oleg.blackout > 0) return;
+  if (phoneOpen || game.oleg.blackout > 0 || game.talkLocked) return;
   if (k.startsWith('Digit')) {
     const n = Number(k.slice(5));
     if (n >= 1 && n <= 4) game.inv.select(n - 1);
@@ -254,7 +254,17 @@ function frame(now) {
 
   if (mode === 'play') {
     game.update(dt);
-    player.update(dt, { drunk: game.oleg.drunk, canMove: !phoneOpen && !(game.oleg.blackout > 0) });
+    // listening to a story: Oleg turns to the guy and can't walk away until the lock ends
+    const listening = game.talkLocked;
+    if (listening) {
+      const [fx, fz] = game.talk.friend.pos;
+      const want = Math.atan2(-(fx - player.x), -(fz - player.z));
+      let dy = want - player.yaw;
+      dy = Math.atan2(Math.sin(dy), Math.cos(dy));
+      player.yaw += dy * Math.min(1, dt * 6);
+      player.pitch += (-0.12 - player.pitch) * Math.min(1, dt * 4);
+    }
+    player.update(dt, { drunk: game.oleg.drunk, canMove: !phoneOpen && !(game.oleg.blackout > 0) && !listening });
     game.olegPos = [player.x, player.z];
     const target = phoneOpen ? null : findTarget();
     currentActions = target?.actions?.() ?? [];
@@ -265,8 +275,10 @@ function frame(now) {
       hud.update(game, { roomName: roomAt(player.x, player.z)?.name, target, actions: currentActions });
     }
     audio.setMusic(game.state.music);
+    audio.voices.update([player.x, player.z]);
   } else {
     audio.setMusic(false);
+    audio.voices.stopAll();
     if (mode === 'orbit') orbit.update();
     else if (mode === 'menu' || mode === 'end') player.update(0);
   }

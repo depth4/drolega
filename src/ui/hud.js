@@ -79,6 +79,12 @@ export function createHUD({ onBuy }) {
 
       set('toasts', el.toasts, game.toasts.map((t) => `<div class="toast ${t.kind}">${t.room ? `<small>${esc(t.room)}</small>` : ''}${esc(t.text)}</div>`).join(''));
 
+      if (game.talkLocked) {
+        const k = game.talk;
+        const left = Math.max(0, Math.ceil((k.dur ?? 6) * 0.5 - (st.t - k.start)));
+        target = { name: `Слушаешь: ${k.friend.name}` , info: () => `уйти можно через ${left} с` };
+        actions = [];
+      }
       let p = '';
       if (target) {
         p += `<div class="what">${esc(target.name)}</div>`;

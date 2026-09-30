@@ -143,7 +143,7 @@ export const CHARS = {
   temych: {
     name: 'Темыч', shirt: '#6b3fa0', hair: '#a07040',
     start: 'sofaB', prefs: { vape: 5, sofa: 3, table: 3 }, drinker: true,
-    quotes: ['Сука. Пацаны, на следующей неделе также…', 'Сукааааа', 'СУКААААА'], voice: 'temych',
+    quotes: ['Сука. Пацаны, на следующей неделе также…', 'Сукааааа', 'СУКААААА'], // text for his quote clip
   },
 };
 
@@ -214,6 +214,7 @@ const PROBLEMS = {
           t = 0;
           const [x, z] = f.front(0.55);
           g.addPuddle(x + rand(-0.12, 0.12), z + rand(-0.12, 0.12));
+          g.reactToPuke(f);
         }
       },
       actions: () => showerActions(f, g),
@@ -285,6 +286,7 @@ const PROBLEMS = {
       actions: () => [{
         key: 'E', text: 'Похлопать по спине',
         run() {
+          g.voices?.play('event_pat', { pos: f.pos });
           f.fun += 10;
           f.clearProblem(true);
           f.endActivity();
@@ -336,6 +338,7 @@ function startWasted(f, g) {
   if (kind === 'puke') {
     const [x, z] = f.front(0.5);
     g.addPuddle(x, z);
+    g.reactToPuke(f);
     f.setProblem(PROBLEMS.puke(f, g));
     f.walkTo(SPOTS.bathStand);
   } else if (kind === 'sleepTub') {
@@ -369,19 +372,62 @@ export class Friend extends Walker {
     this.activity = { id: act, spot, left: rand(...ACTIVITIES[act].dur), t: 0, plateT: 0 };
   }
 
-  // a catchphrase in a speech bubble (+ the recorded voice, louder when Oleg is close)
-  speak(text = this.def.quotes[Math.floor(Math.random() * this.def.quotes.length)]) {
-    this.figure.say(text);
-    if (/сук/i.test(text)) this.figure.play('shout');
-    if (this.def.voice) {
-      const [ox, oz] = this.game.olegPos;
-      const d = Math.hypot(ox - this.pos[0], oz - this.pos[1]);
-      this.game.sfx.voice(this.def.voice, Math.max(0.15, 1 - d / 7));
+  // play one of his recorded clips (src/assets/voice/<id>_<kind>_N.mp3); the sound follows him
+  voice(kind, opts = {}) {
+    return this.game.voices?.play(`${this.id}_${kind}`, { pos: () => this.pos, ...opts });
+  }
+
+  // a line out loud: the recording + a speech bubble + a gesture
+  speak(kind = 'monolog', text = null) {
+    const h = kind ? this.voice(kind) : null;
+    if (!h && !text) return false;
+    this.figure.say(text ?? '…', h ? Math.max(2.5, h.audio.duration || 4) : 3.5);
+    if (/сук/i.test(text ?? '')) this.figure.play('shout');
+    else if (!this.figure.busy) this.figure.play(this.fun > 60 ? 'laugh' : 'talk', { dur: 3 });
+    return true;
+  }
+
+  // catchphrases now and then (Temych). Monologues are what you get when Oleg talks to him.
+  chatter(dt) {
+    if (!this.def.quotes) return;
+    this.chatT = (this.chatT ?? rand(10, 30)) - dt;
+    if (this.chatT > 0 || this.problem || this.figure.pose === 'lie' || this.game.talk?.friend === this) return;
+    this.chatT = rand(30, 55);
+    if ((this.game.voices?.count(/_(monolog|quote)$/) ?? 0) > 0) return;
+    if (!this.speak('quote', this.def.quotes[0])) this.speak(null, this.def.quotes[Math.floor(Math.random() * this.def.quotes.length)]);
+  }
+
+  // sounds that come from what he is doing: coughing, vaping, reacting to a drink
+  sounds(dt) {
+    const coughing = ['cough', 'choke'].includes(this.animLoop());
+    if (coughing) {
+      this.coughT = (this.coughT ?? 0) - dt;
+      if (this.coughT <= 0 && !this.coughH?.playing) {
+        this.coughH = this.voice('cough');
+        this.coughT = rand(2.5, 5);
+      }
     }
+    const vaping = this.activity?.id === 'vape' && this.mode !== 'walk' && !this.problem;
+    this.vapeRetry = (this.vapeRetry ?? 0) - dt;
+    if (vaping && !this.vapeH?.playing && this.vapeRetry <= 0) {
+      this.vapeH = this.voice('vapeloop', { loop: true, gain: 0.8 });
+      this.vapeRetry = 2;
+    }
+    if (!vaping && this.vapeH) {
+      this.vapeH.stop();
+      this.vapeH = null;
+    }
+    this.boozeCd = (this.boozeCd ?? 0) - dt;
+    if (this.boozeIn > 0 && (this.boozeIn -= dt) <= 0) this.voice('booze');
   }
 
   drink(d, buzzTime = 0, kind = 'beer') {
     this.figure.sip(2.4, kind);
+    // reaction to the drink right after the sip (not every time, or it turns into noise)
+    if (this.boozeCd <= 0 && Math.random() < 0.55 && this.game.voices?.has(`${this.id}_booze`)) {
+      this.boozeIn = 1.9;
+      this.boozeCd = rand(18, 30);
+    }
     this.fun += d.fun;
     this.drunk = clamp(this.drunk + d.drunk * (TUNE.drunkMult[this.id] ?? 1));
     if (buzzTime) this.buzz = Math.max(this.buzz ?? 0, buzzTime);
@@ -523,7 +569,12 @@ export class Friend extends Walker {
       this.problem.tick?.(dt);
     }
 
-    if (this.mode === 'walk') {
+    const talking = g.talk?.friend === this;
+    if (talking) {
+      const [ox, oz] = g.olegPos;
+      this.heading = Math.atan2(ox - this.pos[0], oz - this.pos[1]);
+      if (!this.figure.busy) this.figure.play(Math.random() < 0.3 ? 'laugh' : 'talk', { dur: 2.5 });
+    } else if (this.mode === 'walk') {
       // drunk: stumbles now and then, and the pace keeps changing
       const d = this.drunk / 100;
       if (this.lurch > 0) this.lurch -= dt;
@@ -539,10 +590,8 @@ export class Friend extends Walker {
 
     this.def.tick?.(this, g, dt);
     this.fun = clamp(this.fun);
-    if (this.def.quotes && (this.quoteT = (this.quoteT ?? rand(8, 20)) - dt) <= 0) {
-      this.quoteT = rand(30, 55);
-      if (!this.problem) this.speak();
-    }
+    this.chatter(dt);
+    this.sounds(dt);
     this.animate(dt);
   }
 
@@ -613,7 +662,7 @@ export class Friend extends Walker {
         a.closedT += dt;
         if (a.closedT >= TUNE.vape.coughAfter && !this.problem) {
           this.setProblem(PROBLEMS.cough(this, g));
-          if (this.def.quotes) this.speak('Сукааааа');
+          this.speak(null, 'Сукааааа');
         }
       }
     }
@@ -656,10 +705,20 @@ export class Friend extends Walker {
         list.push({
           key: 'R', text: 'Потрещать',
           run: () => {
-            this.fun += 4;
-            g.oleg.fun += 2;
-            this.talkCooldown = 8;
-            this.figure.play(this.fun > 60 ? 'laugh' : 'talk');
+            const h = this.voice('monolog', { gain: 1.1 });
+            if (!h) {
+              // no recording: a quick chat
+              this.fun += 4;
+              g.oleg.fun += 2;
+              this.talkCooldown = 8;
+              this.figure.play(this.fun > 60 ? 'laugh' : 'talk');
+              return;
+            }
+            // he tells his story: Oleg has to stand and listen for the first half
+            this.fun += TUNE.talk.fun;
+            g.oleg.fun += TUNE.talk.olegFun;
+            this.talkCooldown = TUNE.talk.cooldown;
+            g.startTalk(this, h);
           },
         });
       }

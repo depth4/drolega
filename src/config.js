@@ -52,6 +52,9 @@ export const TUNE = {
 
   bladder: { base: 0.6, waitMax: 15 },
 
+  // "Потрещать": he tells a recorded story; Oleg is stuck listening for `lock` of it (0.5 = first half)
+  talk: { fun: 18, olegFun: 6, cooldown: 30, lock: 0.5 },
+
   hut: {
     puddle: 0.3, // per puddle per second
     broken: 0.1, // per broken thing per second

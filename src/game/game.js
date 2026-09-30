@@ -61,8 +61,9 @@ class Inventory {
 }
 
 export class Game {
-  constructor({ scene, apt, furn, sfx }) {
+  constructor({ scene, apt, furn, sfx, voices }) {
     this.scene = scene;
+    this.voices = voices;
     this.apt = apt;
     this.furn = furn;
     this.doors = apt.doors;
@@ -116,6 +117,10 @@ export class Game {
 
   startNight(n) {
     this.night = n;
+    this.voices?.stopAll();
+    this.talk = null;
+    this.reactCd = 0;
+    this.olegCoughT = 0;
     const S = TUNE.start;
     this.state = {
       t: 0,
@@ -349,6 +354,31 @@ export class Game {
     this.dynamic.add(v.figure.root);
     this.visitor = v;
     this.alert('Стучат в дверь… (глянь в камеру: F)', 'Прихожая');
+    // the party reacts to the knocking (neighbours / police)
+    if (v.type === 'neighbor' || v.type === 'police') {
+      const t = this.furn.items.partyTable;
+      setTimeout(() => this.visitor === v && this.voices?.play('event_neighbors', { pos: [(t.x0 + t.x1) / 2, (t.z0 + t.z1) / 2] }), 1600);
+    }
+  }
+
+  // Oleg listens to a story: stuck facing him for the first part of the clip
+  startTalk(friend, h) {
+    this.talk = { friend, h, start: this.state.t, dur: null };
+    friend.figure.say('…', 4);
+  }
+
+  get talkLocked() {
+    const k = this.talk;
+    if (!k) return false;
+    const dur = k.dur ?? 6;
+    return this.state.t - k.start < dur * TUNE.talk.lock;
+  }
+
+  // somebody near Lyokha reacts to the vomit (not every time)
+  reactToPuke(f) {
+    if (this.state.t < this.reactCd || Math.random() > 0.6) return;
+    this.reactCd = this.state.t + 25;
+    setTimeout(() => this.voices?.play('event_puke', { pos: [...f.pos] }), 700);
   }
 
   dismissVisitor() {
@@ -566,6 +596,27 @@ export class Game {
 
     for (const p of this.pending.filter((p) => p.at <= st.t)) p.fn();
     this.pending = this.pending.filter((p) => p.at > st.t);
+
+    // story time
+    if (this.talk) {
+      const k = this.talk;
+      const d = k.h.audio.duration;
+      if (!k.dur && Number.isFinite(d) && d > 0) {
+        k.dur = d;
+        k.friend.figure.say('…', d);
+      }
+      const done = !k.h.playing && st.t - k.start > 0.5;
+      if (done || st.t - k.start > (k.dur ?? 6) + 0.3 || k.friend.problem) this.talk = null;
+    }
+
+    // Oleg coughs in the smoke: on the balcony by the grill, or next to someone coughing
+    const olegRoom = roomAt(this.olegPos[0], this.olegPos[1])?.id;
+    const smoky = (olegRoom === 'balcony' && this.grill.lit && !this.doors.balcony.open) ||
+      this.friends.some((f) => ['cough', 'choke'].includes(f.problem?.id) && f.room?.id === olegRoom && Math.hypot(f.pos[0] - this.olegPos[0], f.pos[1] - this.olegPos[1]) < 2.5);
+    if (smoky && (this.olegCoughT -= dt) <= 0) {
+      this.olegCoughT = rand(5, 9);
+      this.voices?.play('oleg_cough', { gain: 0.9 });
+    } else if (!smoky) this.olegCoughT = Math.min(this.olegCoughT, 1);
 
     // Oleg
     const o = this.oleg;
