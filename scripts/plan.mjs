@@ -4,7 +4,7 @@ import { writeFileSync, mkdirSync } from 'node:fs';
 import { ROOMS, WALLS, DIAG_WALLS, BALCONY, FURNITURE, START, MIRROR, mx } from '../src/world/layout.js';
 
 const S = 110; // px per meter
-const minX = -1.3, minZ = -1.6, maxX = 9.1, maxZ = 6.5;
+const minX = -3.0, minZ = -1.6, maxX = 9.1, maxZ = 6.8;
 const X = (x) => ((x - minX) * S).toFixed(1);
 const Z = (z) => ((z - minZ) * S + 60).toFixed(1);
 const width = (maxX - minX) * S, height = (maxZ - minZ) * S + 60;
@@ -21,7 +21,7 @@ const text = (x, z, s, attrs = '') => {
 // short labels where the footprint is too small for the full name
 const shortLabel = { fridge: 'Холо-\nдильник', microwave: 'Микро-\nволновка', counter: 'Тумба\nс ящиками', stenka: 'Стенка + телик', kitchenTable: 'Стол', bathSink: 'Раков.' };
 // room label positions in plan coords (mirrored like everything else)
-const roomLabelAt = { bedroom: [1.65, 3.0], living: [4.0, 4.3], kitchen: [6.85, 1.02], bath: [5.98, 2.62], hall: [6.3, 5.12], balcony: [3.95, -0.75] };
+const roomLabelAt = { bedroom: [1.65, 3.0], living: [4.0, 4.3], kitchen: [6.85, 1.02], bath: [5.98, 2.62], hall: [6.05, 4.5], balcony: [3.95, -0.75], landing: [9.6, 5.6] };
 
 const roomFill = { bedroom: '#dfe7f0', living: '#efe4cf', kitchen: '#e4ecd2', bath: '#d6ecee', hall: '#ecd9c8', balcony: '#e2e0dc' };
 
@@ -100,7 +100,7 @@ for (const room of ROOMS) {
 
 // Oleg start + entrance marker
 const ex = WALLS.find((w) => w.id === 'east');
-const entX = (ex.x0 + ex.x1) / 2 + (ex.x0 < 1 ? -0.55 : 0.55);
+const entX = (ex.x0 + ex.x1) / 2 + (ex.x0 < 1 ? -0.7 : 0.7);
 text(entX, 5.0, 'ВХОД', `font-size="13" font-weight="bold" text-anchor="middle" fill="#8a4a2a"`);
 const fx = -Math.sin(START.yaw) * 0.45, fz = -Math.cos(START.yaw) * 0.45;
 add(`<circle cx="${X(START.x)}" cy="${Z(START.z)}" r="9" fill="#d9822b"/>`);

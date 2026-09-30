@@ -41,6 +41,7 @@ const player = new Player(camera, [...apt.colliders, ...furn.colliders]);
 const fx = makeFX(renderer, scene, camera);
 const hud = createHUD({ onBuy: (id) => game.buy(id) });
 window.__game = game; // handy in the console
+window.__player = player;
 
 const orbit = new OrbitControls(orbitCam, canvas);
 orbit.target.set(4.05, 0, 2.4);

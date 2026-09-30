@@ -1,0 +1,35 @@
+# 5 ночей на хате у Олега
+
+Browser 3D game (three.js + Vite, vanilla JS), a birthday gift. FNAF × Who's Your Daddy set in a real 2-room khrushchevka. Game design lives in `docs/CONCEPT.md`; keep it in sync when mechanics change. All player-facing text is Russian.
+
+## Commands
+
+- `npm install`, then `npm run dev` (http://localhost:5173)
+- `npm run build` builds to `dist/`, which works from any subfolder (`base: './'`)
+- `npm run plan` regenerates `docs/plan.svg` from the layout data
+
+## Map of the code
+
+- `src/world/layout.js` is the single source of truth for geometry: rooms, walls, openings, diagonal bath wall, furniture footprints, nav graph, friend and cat spots, toy hiding places, door camera.
+  - Everything is authored in **plan coordinates** (as on the BTI drawing) and mirrored on export (`MIRROR = true`). Never hand-mirror numbers.
+  - +X is right on the drawing, +Z is down (away from the windows), meters.
+- `src/world/apartment.js` builds walls with openings, wallpaper linings (only where a wall face exists), floors, windows, and the hinged doors (`doors.balcony/bath/entrance`).
+- `src/world/furniture.js`: each item is built in a local frame (u along the wall, v from the wall to the front, y up). Colliders come from layout footprints.
+- `src/world/figures.js` has the people, the cat, name sprites, puddles, toy, bottles, and broken marks. `textures.js` has procedural canvas textures (no image assets).
+- `src/game/friends.js` has the characters: activities, problems, and the actions Oleg can take on them. `game.js` runs the night: meters, noise and neighbours, visitors and courier, stove, grill, inventory, and the interactable targets.
+- `src/config.js` holds **all balance numbers**. Tune there, not in code.
+- `src/main.js` does renderer, modes (menu/play/orbit/end), input, raycast targeting, and the door-camera render copied into the phone. `player.js` is FPS movement with collisions and drunk sway. `fx.js` is the drunk shader. `audio.js` is synthesized sounds and music. `ui/hud.js` is the DOM HUD and phone.
+
+## Conventions
+
+- Interactable = any Object3D with `userData.target = { name, info?(), actions() -> [{ key: 'E'|'R'|'T', text, run }] }`.
+- Keys are read via `e.code`, so a Russian keyboard layout works.
+- No external assets: textures are canvas-generated and sounds are WebAudio.
+
+## Debugging
+
+URL params:
+- `?view=top` or `?view=orbit` opens the dollhouse view.
+- `?play` starts without pointer lock. Add `x`, `z`, `yaw`, `pitch` (degrees) to place Oleg, `t=SECONDS` to fast-forward the sim, `phone` to open the phone, `night=N` to pick a night.
+
+`window.__game` and `window.__player` are exposed. Headless Chromium for screenshots is at `/opt/pw-browsers/chromium`; launch it with `--use-angle=swiftshader --enable-unsafe-swiftshader`. It renders at about 1–2 fps, so wait a few seconds between steps.
