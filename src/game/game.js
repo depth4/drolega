@@ -72,6 +72,7 @@ export class Game {
     this.toastKeys = {};
     this.onEnd = null;
     this.night = 1;
+    this.style = 'box';
     this.friends = [];
     this.inv = new Inventory(this);
     this.olegPos = [0, 0];
@@ -86,6 +87,23 @@ export class Game {
   }
 
   // problem frequency: grows each night, and every night starts calm and ramps up (TUNE.warmup)
+  // swap every guy's look between 'box' (cube heads) and 'sprite' (Doom-style billboards)
+  restyle(style) {
+    this.style = style;
+    for (const f of this.friends) {
+      const old = f.figure;
+      const nf = makePerson({ ...f.def, style, faceId: f.id });
+      nf.root.position.copy(old.root.position);
+      nf.root.rotation.copy(old.root.rotation);
+      nf.root.userData = old.root.userData;
+      nf.setPose(old.pose, f.y);
+      if (f.problem) nf.setStatus(f.problem.short);
+      this.dynamic.remove(old.root);
+      this.dynamic.add(nf.root);
+      f.figure = nf;
+    }
+  }
+
   get diff() {
     const W = TUNE.warmup;
     const ramp = Math.min(1, Math.max(0, (this.state.t - W.calm) / W.ramp));
@@ -320,7 +338,7 @@ export class Game {
   showVisitor(v) {
     v.left = v.patience;
     v.knockT = 0;
-    v.figure = makePerson({ name: v.name, shirt: v.shirt, pants: v.pants });
+    v.figure = makePerson({ name: v.name, shirt: v.shirt, pants: v.pants, style: this.style });
     const [x, z] = VISITOR_SPOT;
     v.figure.root.position.set(x, 0, z);
     const [dx, dz] = this.doors.entrance.center;

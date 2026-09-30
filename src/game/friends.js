@@ -133,6 +133,7 @@ export const CHARS = {
   temych: {
     name: 'Темыч', shirt: '#6b3fa0', hair: '#a07040',
     start: 'sofaB', prefs: { vape: 5, sofa: 3, table: 3 }, drinker: true,
+    quotes: ['Сука. Пацаны, на следующей неделе также…', 'Сукааааа', 'СУКААААА'], voice: 'temych',
   },
 };
 
@@ -337,7 +338,7 @@ function startWasted(f, g) {
 export class Friend extends Walker {
   constructor(game, id) {
     const def = CHARS[id];
-    super(game, makePerson(def), 1.4, true);
+    super(game, makePerson({ ...def, style: game.style, faceId: id }), 1.4, true);
     this.id = id;
     this.def = def;
     this.name = def.name;
@@ -353,6 +354,16 @@ export class Friend extends Walker {
     this.place(spot);
     const act = Object.entries(ACTIVITIES).find(([, a]) => a.spots.includes(def.start))?.[0];
     this.activity = { id: act, spot, left: rand(...ACTIVITIES[act].dur), t: 0, plateT: 0 };
+  }
+
+  // a catchphrase in a speech bubble (+ the recorded voice, louder when Oleg is close)
+  speak(text = this.def.quotes[Math.floor(Math.random() * this.def.quotes.length)]) {
+    this.figure.say(text);
+    if (this.def.voice) {
+      const [ox, oz] = this.game.olegPos;
+      const d = Math.hypot(ox - this.pos[0], oz - this.pos[1]);
+      this.game.sfx.voice(this.def.voice, Math.max(0.15, 1 - d / 7));
+    }
   }
 
   drink(d, buzzTime = 0) {
@@ -459,7 +470,11 @@ export class Friend extends Walker {
 
     this.def.tick?.(this, g, dt);
     this.fun = clamp(this.fun);
-    this.figure.animate(this.t, this.mode === 'walk', this.drunk / 100);
+    if (this.def.quotes && (this.quoteT = (this.quoteT ?? rand(8, 20)) - dt) <= 0) {
+      this.quoteT = rand(30, 55);
+      if (!this.problem) this.speak();
+    }
+    this.figure.animate(this.t, this.mode === 'walk', this.drunk / 100, dt);
   }
 
   tickActivity(dt) {
@@ -526,7 +541,10 @@ export class Friend extends Walker {
       const door = a.spot.id === 'balcony' ? g.doors.balcony : g.doors.bath;
       if (!door.open) {
         a.closedT += dt;
-        if (a.closedT >= TUNE.vape.coughAfter && !this.problem) this.setProblem(PROBLEMS.cough(this, g));
+        if (a.closedT >= TUNE.vape.coughAfter && !this.problem) {
+          this.setProblem(PROBLEMS.cough(this, g));
+          if (this.def.quotes) this.speak('Сукааааа');
+        }
       }
     }
 

@@ -104,7 +104,7 @@ const PLAN_FURNITURE = [
   // living room
   { id: 'sofa', label: 'Диван', ...r(2.45, 3.3, 1.2, 3.2), facing: '+x' },
   { id: 'partyTable', label: 'Праздничный стол', ...r(3.6, 4.4, 2.0, 3.2) },
-  { id: 'stenka', label: 'Стенка с теликом', ...r(5.0, 5.46, 1.6, 3.9), facing: '-x' },
+  { id: 'stenka', label: 'Стенка с теликом', ...r(5.0, 5.46, 1.45, 3.4), facing: '-x' }, // ends before the open passage to the hall (z 3.5)
   { id: 'ficus', label: 'Фикус', ...r(5.05, 5.4, 0.08, 0.4) },
   // kitchen
   { id: 'fridge', label: 'Холодильник', ...r(5.62, 6.18, 1.3, 1.88), facing: '-z' },

@@ -1,4 +1,8 @@
-// All sounds are synthesized with WebAudio — no files. Call init() from a click.
+// Sounds are synthesized with WebAudio; the only recordings are the guys' voices. Call init() from a click.
+import temych from './assets/voice/temych.mp3?inline';
+
+const VOICES = { temych };
+const playing = {};
 let ctx = null;
 let master = null;
 let musicTimer = null;
@@ -59,6 +63,13 @@ export const sfx = {
   whoosh: () => noise(0.4, { vol: 0.4, freq: 900, q: 0.4 }),
   fix: () => [0, 0.15, 0.3].forEach((w) => tone(1200, 0.05, { vol: 0.08, when: w })),
   click: () => tone(1500, 0.03, { vol: 0.05 }),
+  voice(id, volume = 1) {
+    if (!ctx || !VOICES[id] || playing[id] && !playing[id].ended) return;
+    const a = new Audio(VOICES[id]);
+    a.volume = Math.max(0, Math.min(1, volume));
+    a.play().catch(() => {});
+    playing[id] = a;
+  },
 };
 
 // Party music: a dumb 4-chord loop with a kick. Plays while the stereo is on.

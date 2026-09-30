@@ -2,6 +2,7 @@
 // People face local +z (Object3D.lookAt points +z at the target).
 import * as THREE from 'three';
 import { mat } from './apartment.js';
+import { drawFace } from './faces.js';
 
 export function textSprite(text, { bg = 'rgba(20,18,24,0.78)', fg = '#fff', size = 40, scale = 0.001 } = {}) {
   const c = document.createElement('canvas');
@@ -30,7 +31,72 @@ export function textSprite(text, { bg = 'rgba(20,18,24,0.78)', fg = '#fff', size
   return sprite;
 }
 
-export function makePerson({ name, shirt, pants = '#2b2f3a', skin = '#e2b594', hair = '#3b2a1e', label = true }) {
+// Name tag, problem bubble and speech bubble shared by both character styles.
+function makeTags(root, name, label) {
+  let nameTag = null, bubble = null, bubbleText = null, speech = null, speechLeft = 0;
+  let baseY = 1.95;
+  if (label) {
+    nameTag = textSprite(name);
+    root.add(nameTag);
+  }
+  const place = () => {
+    if (nameTag) nameTag.position.y = baseY;
+    if (bubble) bubble.position.y = baseY + 0.28;
+    if (speech) speech.position.y = baseY + (bubble ? 0.56 : 0.28);
+  };
+  place();
+  return {
+    setY(y) {
+      baseY = y;
+      place();
+    },
+    setStatus(text, color = '#c0392b') {
+      if (text === bubbleText) return;
+      bubbleText = text;
+      if (bubble) {
+        root.remove(bubble);
+        bubble.material.map.dispose();
+        bubble = null;
+      }
+      if (text) {
+        bubble = textSprite(`! ${text}`, { bg: color, size: 36 });
+        root.add(bubble);
+      }
+      place();
+    },
+    say(text, seconds = 3.5) {
+      if (speech) root.remove(speech);
+      speech = textSprite(`«${text}»`, { bg: 'rgba(250,246,236,0.95)', fg: '#1b1408', size: 34 });
+      speechLeft = seconds;
+      root.add(speech);
+      place();
+    },
+    tick(dt) {
+      if (speech && (speechLeft -= dt) <= 0) {
+        root.remove(speech);
+        speech.material.map.dispose();
+        speech = null;
+      }
+    },
+  };
+}
+
+// style: 'box' — low-poly body with a cube head (photo on the front); 'sprite' — flat Doom-style billboard
+export function makePerson(opts) {
+  return opts.style === 'sprite' ? makeSpritePerson(opts) : makeBoxPerson(opts);
+}
+
+function faceTexture(opts, size = 128) {
+  const c = document.createElement('canvas');
+  c.width = c.height = size;
+  const tex = new THREE.CanvasTexture(c);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  drawFace(c.getContext('2d'), opts.faceId, opts, 0, 0, size, size, () => (tex.needsUpdate = true));
+  return tex;
+}
+
+function makeBoxPerson(opts) {
+  const { name, shirt, pants = '#2b2f3a', skin = '#e2b594', hair = '#3b2a1e', label = true } = opts;
   const root = new THREE.Group();
   const body = new THREE.Group();
   root.add(body);
@@ -46,41 +112,27 @@ export function makePerson({ name, shirt, pants = '#2b2f3a', skin = '#e2b594', h
     leg.position.x = x;
     legs.add(leg);
   }
-  const torso = new THREE.Mesh(new THREE.CapsuleGeometry(0.2, 0.36, 4, 10).translate(0, 0.33, 0), m.shirt);
-  torso.scale.z = 0.7;
+  const torso = new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.62, 0.26).translate(0, 0.31, 0), m.shirt);
   hips.add(torso);
   const arms = [];
   for (const side of [-1, 1]) {
     const arm = new THREE.Group();
-    arm.position.set(side * 0.26, 0.58, 0);
-    arm.add(new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.6, 0.12).translate(0, -0.3, 0), m.shirt));
-    const hand = new THREE.Mesh(new THREE.SphereGeometry(0.05, 8, 6).translate(0, -0.62, 0), m.skin);
-    arm.add(hand);
+    arm.position.set(side * 0.27, 0.58, 0);
+    arm.add(new THREE.Mesh(new THREE.BoxGeometry(0.11, 0.6, 0.13).translate(0, -0.3, 0), m.shirt));
+    arm.add(new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.1, 0.1).translate(0, -0.64, 0), m.skin));
     hips.add(arm);
     arms.push(arm);
   }
-  const head = new THREE.Group();
-  head.position.y = 0.88;
+  // cube head: face on the front (+z), hair on top and back
+  const face = new THREE.MeshStandardMaterial({ map: faceTexture({ ...opts, skin, hair }), roughness: 0.8 });
+  const head = new THREE.Mesh(new THREE.BoxGeometry(0.32, 0.36, 0.3).translate(0, 0.2, 0), [m.skin, m.skin, m.hair, m.skin, face, m.hair]);
+  head.position.y = 0.64;
   hips.add(head);
-  head.add(new THREE.Mesh(new THREE.SphereGeometry(0.14, 16, 12), m.skin));
-  head.add(new THREE.Mesh(new THREE.SphereGeometry(0.147, 16, 12, 0, Math.PI * 2, 0, Math.PI / 2.2).rotateX(-0.25), m.hair));
-  const eye = mat('#111');
-  for (const x of [-0.05, 0.05]) head.add(new THREE.Mesh(new THREE.SphereGeometry(0.02, 8, 6).translate(x, 0.02, 0.13), eye));
 
-  let nameTag = null;
-  if (label) {
-    nameTag = textSprite(name);
-    nameTag.position.y = 1.95;
-    root.add(nameTag);
-  }
-  let bubble = null;
-  let bubbleText = null;
-
+  const tags = makeTags(root, name, label);
   let pose = 'stand';
-  const person = {
-    root,
-    body,
-    arms,
+  return {
+    root, body, arms, ...tags,
     setPose(p, y = 0) {
       pose = p;
       body.rotation.set(0, 0, 0);
@@ -92,26 +144,13 @@ export function makePerson({ name, shirt, pants = '#2b2f3a', skin = '#e2b594', h
         legs.rotation.x = -Math.PI / 2;
       } else if (p === 'lie') {
         body.rotation.x = -Math.PI / 2;
-        body.position.y = y + 0.12;
+        body.position.y = y + 0.14;
         body.position.z = 0.8;
       }
-      if (nameTag) nameTag.position.y = p === 'lie' ? 1.1 + y : p === 'sit' ? 1.6 + y : 1.95;
-      if (bubble) bubble.position.y = nameTag.position.y + 0.28;
+      tags.setY(p === 'lie' ? 1.1 + y : p === 'sit' ? 1.6 + y : 1.95);
     },
-    setStatus(text, color = '#c0392b') {
-      if (text === bubbleText) return;
-      bubbleText = text;
-      if (bubble) {
-        root.remove(bubble);
-        bubble.material.map.dispose();
-        bubble = null;
-      }
-      if (!text) return;
-      bubble = textSprite(`! ${text}`, { bg: color, size: 36 });
-      bubble.position.y = (nameTag?.position.y ?? 1.9) + 0.28;
-      root.add(bubble);
-    },
-    animate(t, walking, extra = 0) {
+    animate(t, walking, extra = 0, dt = 0) {
+      tags.tick(dt);
       if (pose === 'stand' && walking) {
         const s = Math.sin(t * 9);
         legs.children[0].rotation.x = s * 0.5;
@@ -124,14 +163,98 @@ export function makePerson({ name, shirt, pants = '#2b2f3a', skin = '#e2b594', h
         arms[0].rotation.x = arms[1].rotation.x = 0;
         body.position.y = 0;
       }
-      // idle sway / drunk wobble
       if (pose !== 'lie') hips.rotation.z = Math.sin(t * 1.7) * (0.02 + extra * 0.12);
     },
     get pose() {
       return pose;
     },
   };
-  return person;
+}
+
+// Doom-style: one pixelated billboard, two walk frames, face photo squashed into ~16 px
+function makeSpritePerson(opts) {
+  const { name, shirt, pants = '#2b2f3a', skin = '#e2b594', hair = '#3b2a1e', label = true } = opts;
+  const W = 32, Hh = 64;
+  const frames = [0, 1].map((frame) => {
+    const c = document.createElement('canvas');
+    c.width = W;
+    c.height = Hh;
+    const tex = new THREE.CanvasTexture(c);
+    tex.magFilter = tex.minFilter = THREE.NearestFilter;
+    tex.generateMipmaps = false;
+    tex.colorSpace = THREE.SRGBColorSpace;
+    const g = c.getContext('2d');
+    const paint = () => {
+      g.clearRect(0, 0, W, Hh);
+      // legs
+      g.fillStyle = pants;
+      if (frame === 0) {
+        g.fillRect(10, 38, 5, 24);
+        g.fillRect(17, 38, 5, 24);
+      } else {
+        g.fillRect(8, 38, 5, 24);
+        g.fillRect(19, 38, 5, 24);
+      }
+      g.fillStyle = '#1a1a1a';
+      g.fillRect(frame ? 7 : 9, 61, 7, 3);
+      g.fillRect(frame ? 18 : 16, 61, 7, 3);
+      // torso + arms
+      g.fillStyle = shirt;
+      g.fillRect(8, 19, 16, 21);
+      g.fillRect(4, 20, 4, 15 + (frame ? 2 : 0));
+      g.fillRect(24, 20, 4, 15 + (frame ? 0 : 2));
+      g.fillStyle = skin;
+      g.fillRect(4, 35 + (frame ? 2 : 0), 4, 3);
+      g.fillRect(24, 35 + (frame ? 0 : 2), 4, 3);
+      g.fillStyle = 'rgba(0,0,0,0.25)';
+      g.fillRect(8, 36, 16, 4);
+      // head: tiny canvas first, so the photo turns into chunky pixels
+      const hc = document.createElement('canvas');
+      hc.width = 16;
+      hc.height = 18;
+      drawFace(hc.getContext('2d'), opts.faceId, { skin, hair }, 0, 0, 16, 18);
+      g.drawImage(hc, 8, 1);
+      tex.needsUpdate = true;
+    };
+    paint();
+    drawFace(document.createElement('canvas').getContext('2d'), opts.faceId, { skin, hair }, 0, 0, 1, 1, paint);
+    return tex;
+  });
+  const material = new THREE.SpriteMaterial({ map: frames[0], transparent: true, alphaTest: 0.5 });
+  const sprite = new THREE.Sprite(material);
+  sprite.center.set(0.5, 0);
+  sprite.scale.set(0.875, 1.75, 1);
+  const root = new THREE.Group();
+  root.add(sprite);
+  const tags = makeTags(root, name, label);
+  let pose = 'stand';
+  return {
+    root, body: sprite, arms: [], ...tags,
+    setPose(p, y = 0) {
+      pose = p;
+      material.rotation = 0;
+      sprite.center.set(0.5, 0);
+      sprite.scale.set(0.875, 1.75, 1);
+      sprite.position.set(0, y, 0);
+      if (p === 'sit') {
+        sprite.scale.set(0.875, 1.35, 1);
+        sprite.position.y = y + 0.1;
+      } else if (p === 'lie') {
+        material.rotation = Math.PI / 2;
+        sprite.center.set(0.5, 0.5);
+        sprite.position.y = y + 0.3;
+      }
+      tags.setY(p === 'lie' ? 1.1 + y : p === 'sit' ? 1.6 + y : 1.95);
+    },
+    animate(t, walking, extra = 0, dt = 0) {
+      tags.tick(dt);
+      material.map = frames[walking && Math.sin(t * 9) > 0 ? 1 : 0];
+      if (pose === 'stand') material.rotation = Math.sin(t * 1.7) * (0.01 + extra * 0.08);
+    },
+    get pose() {
+      return pose;
+    },
+  };
 }
 
 export function makeCat() {

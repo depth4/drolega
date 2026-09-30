@@ -151,20 +151,21 @@ const BUILD = {
   },
   stenka(f) {
     const { U, D } = f;
+    const col = Math.min(0.7, U * 0.3); // glass cabinets on both sides of the TV niche
     f.box(0, U, 0, 0.75, 0, D, M.darkWood);
     f.box(0, U, 1.5, 2.2, 0, D, M.darkWood);
-    f.box(0, 0.7, 0.75, 1.5, 0, D, M.darkWood);
-    f.box(U - 0.7, U, 0.75, 1.5, 0, D, M.darkWood);
-    f.box(0.7, U - 0.7, 0.75, 1.5, 0, 0.03, M.darkWood);
+    f.box(0, col, 0.75, 1.5, 0, D, M.darkWood);
+    f.box(U - col, U, 0.75, 1.5, 0, D, M.darkWood);
+    f.box(col, U - col, 0.75, 1.5, 0, 0.03, M.darkWood);
     // glass doors with soviet crystal
-    for (const [u0, u1] of [[0.05, 0.65], [U - 0.65, U - 0.05]]) {
+    for (const [u0, u1] of [[0.05, col - 0.05], [U - col + 0.05, U - 0.05]]) {
       f.box(u0, u1, 0.8, 1.45, D, D + 0.01, M.glassDoor);
-      for (let k = 0; k < 3; k++) f.cyl(u0 + 0.12 + k * 0.18, D - 0.15, 0.8, 0.95, 0.04, 0.05, M.crystal, 10);
+      for (let k = 0; k < 3; k++) f.cyl(u0 + (u1 - u0) * (0.2 + k * 0.3), D - 0.15, 0.8, 0.95, 0.04, 0.05, M.crystal, 10);
     }
     for (let k = 0; k < 4; k++) f.box(0.05 + k * (U / 4), (k + 1) * (U / 4) - 0.05, 0.05, 0.7, D, D + 0.01, M.wood);
     // TV in the niche
-    f.box(0.8, U - 0.8, 0.78, 1.28, 0.05, D - 0.02, mat('#2b2b2b', { roughness: 0.5 }));
-    f.box(0.85, U - 0.85, 0.83, 1.23, D - 0.02, D - 0.01, M.screen);
+    f.box(col + 0.05, U - col - 0.05, 0.78, 1.28, 0.05, D - 0.02, mat('#2b2b2b', { roughness: 0.5 }));
+    f.box(col + 0.1, U - col - 0.1, 0.83, 1.23, D - 0.02, D - 0.01, M.screen);
   },
   ficus(f) {
     const { U, D } = f;

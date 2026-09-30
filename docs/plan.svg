@@ -13,7 +13,7 @@
 <rect x="1116.5" y="340.5" width="100.1" height="214.5" fill="#fff" fill-opacity="0.85" stroke="#555" stroke-width="1.2" />
 <rect x="858.0" y="368.0" width="93.5" height="220.0" fill="#fff" fill-opacity="0.85" stroke="#555" stroke-width="1.2" />
 <rect x="737.0" y="456.0" width="88.0" height="132.0" fill="#fff" fill-opacity="0.85" stroke="#555" stroke-width="1.2" />
-<rect x="620.4" y="412.0" width="50.6" height="253.0" fill="#fff" fill-opacity="0.85" stroke="#555" stroke-width="1.2" />
+<rect x="620.4" y="395.5" width="50.6" height="214.5" fill="#fff" fill-opacity="0.85" stroke="#555" stroke-width="1.2" />
 <rect x="627.0" y="244.8" width="38.5" height="35.2" fill="#fff" fill-opacity="0.85" stroke="#555" stroke-width="1.2" />
 <rect x="541.2" y="379.0" width="61.6" height="63.8" fill="#fff" fill-opacity="0.85" stroke="#555" stroke-width="1.2" />
 <rect x="393.8" y="379.0" width="147.4" height="63.8" fill="#fff" fill-opacity="0.85" stroke="#555" stroke-width="1.2" />
@@ -58,7 +58,7 @@
 <text x="1166.5" y="452.1" font-size="11" text-anchor="middle" fill="#333" ><tspan x="1166.5" dy="0em">Кровать Олега</tspan></text>
 <text x="904.8" y="482.4" font-size="11" text-anchor="middle" fill="#333" ><tspan x="904.8" dy="0em">Диван</tspan></text>
 <text x="781.0" y="526.4" font-size="11" text-anchor="middle" fill="#333" ><tspan x="781.0" dy="0em">Праздничный стол</tspan></text>
-<text x="645.7" y="542.9" font-size="11" text-anchor="middle" fill="#333" transform="rotate(-90 645.7 538.5)"><tspan x="645.7" dy="0em">Стенка + телик</tspan></text>
+<text x="645.7" y="507.1" font-size="11" text-anchor="middle" fill="#333" transform="rotate(-90 645.7 502.8)"><tspan x="645.7" dy="0em">Стенка + телик</tspan></text>
 <text x="646.3" y="266.8" font-size="11" text-anchor="middle" fill="#333" ><tspan x="646.3" dy="0em">Фикус</tspan></text>
 <text x="572.0" y="415.3" font-size="11" text-anchor="middle" fill="#333" ><tspan x="572.0" dy="-0.55em">Холо-</tspan><tspan x="572.0" dy="1.1em">дильник</tspan></text>
 <text x="440.0" y="415.3" font-size="11" text-anchor="middle" fill="#333" ><tspan x="440.0" dy="-0.55em">Тумба</tspan><tspan x="440.0" dy="1.1em">с ящиками</tspan></text>

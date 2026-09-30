@@ -141,6 +141,19 @@ game.onEnd = (res) => {
 
 $('btn-play').addEventListener('click', play);
 $('btn-orbit').addEventListener('click', toOrbit);
+
+// character look: cube heads with photo faces, or Doom-style pixel sprites
+const STYLE_NAMES = { box: 'Бошки: кубы', sprite: 'Бошки: спрайты (как в Doom)' };
+function setStyle(style) {
+  game.restyle(style);
+  $('btn-style').textContent = STYLE_NAMES[style];
+  try {
+    localStorage.setItem('oleg-style', style);
+  } catch {
+    /* no storage: the choice just isn't remembered */
+  }
+}
+$('btn-style').addEventListener('click', () => setStyle(game.style === 'box' ? 'sprite' : 'box'));
 $('btn-back').addEventListener('click', pause);
 $('btn-next').addEventListener('click', () => {
   const win = game.over?.win;
@@ -285,6 +298,13 @@ function frame(now) {
 }
 
 // ---------- boot ----------
+try {
+  game.style = params.get('heads') ?? localStorage.getItem('oleg-style') ?? 'box';
+} catch {
+  game.style = params.get('heads') ?? 'box';
+}
+if (!STYLE_NAMES[game.style]) game.style = 'box';
+$('btn-style').textContent = STYLE_NAMES[game.style];
 startNight(Number(params.get('night')) || 1);
 started = false; // the menu offers "start", not "continue"
 player.update(0);
