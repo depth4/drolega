@@ -120,7 +120,8 @@ export class Game {
     this.voices?.stopAll();
     this.talk = null;
     this.reactCd = 0;
-    this.olegCoughT = 0;
+    this.koch = null;
+    this.kochT = null;
     const S = TUNE.start;
     this.state = {
       t: 0,
@@ -374,6 +375,59 @@ export class Game {
     return this.state.t - k.start < dur * TUNE.talk.lock;
   }
 
+  // ---------- "Коч!": one guy yells it, others randomly pick it up, the chain fades out ----------
+  kochCandidates() {
+    const list = this.friends.filter((f) => this.voices?.has(`${f.id}_koch`) && !f.problem && this.talk?.friend !== f);
+    if (this.voices?.has('oleg_koch')) list.push('oleg');
+    return list;
+  }
+
+  kochShout(who) {
+    const K = TUNE.koch;
+    let h;
+    if (who === 'oleg') h = this.voices.play('oleg_koch', { gain: 0.9 });
+    else {
+      h = who.voice('koch');
+      who.figure.say('Кооооч!', 2.2);
+      who.figure.play('shout');
+      who.fun += K.fun;
+    }
+    this.koch.step += 1;
+    this.koch.last = who;
+    this.koch.h = h;
+    this.koch.start = this.state.t;
+    this.koch.gap = rand(0.1, 0.7);
+    this.state.noise += K.noise;
+    this.oleg.fun += K.olegFun;
+  }
+
+  kochTick(dt) {
+    const K = TUNE.koch, st = this.state;
+    const pick = (a) => a[Math.floor(Math.random() * a.length)];
+    if (!this.koch) {
+      if (st.t < K.firstAfter) return;
+      this.kochT = (this.kochT ?? rand(...K.every)) - dt;
+      if (this.kochT > 0) return;
+      this.kochT = rand(...K.every) / this.diff;
+      const starters = this.kochCandidates().filter((c) => c !== 'oleg');
+      if (!starters.length) return;
+      this.koch = { step: 0 };
+      this.kochShout(pick(starters));
+      return;
+    }
+    // the next one answers when the current shout is mostly over
+    const k = this.koch;
+    const dur = Number.isFinite(k.h?.audio.duration) ? k.h.audio.duration : 2;
+    if (st.t - k.start < Math.min(dur, 3) * 0.7 + k.gap && k.h?.playing !== false) return;
+    const pool = this.kochCandidates().filter((c) => c !== k.last);
+    const chance = K.chance * Math.pow(K.decay, k.step - 1);
+    if (k.step >= K.max || !pool.length || Math.random() > chance) {
+      this.koch = null;
+      return;
+    }
+    this.kochShout(pick(pool));
+  }
+
   // somebody near Lyokha reacts to the vomit (not every time)
   reactToPuke(f) {
     if (this.state.t < this.reactCd || Math.random() > 0.6) return;
@@ -609,14 +663,7 @@ export class Game {
       if (done || st.t - k.start > (k.dur ?? 6) + 0.3 || k.friend.problem) this.talk = null;
     }
 
-    // Oleg coughs in the smoke: on the balcony by the grill, or next to someone coughing
-    const olegRoom = roomAt(this.olegPos[0], this.olegPos[1])?.id;
-    const smoky = (olegRoom === 'balcony' && this.grill.lit && !this.doors.balcony.open) ||
-      this.friends.some((f) => ['cough', 'choke'].includes(f.problem?.id) && f.room?.id === olegRoom && Math.hypot(f.pos[0] - this.olegPos[0], f.pos[1] - this.olegPos[1]) < 2.5);
-    if (smoky && (this.olegCoughT -= dt) <= 0) {
-      this.olegCoughT = rand(5, 9);
-      this.voices?.play('oleg_cough', { gain: 0.9 });
-    } else if (!smoky) this.olegCoughT = Math.min(this.olegCoughT, 1);
+    this.kochTick(dt);
 
     // Oleg
     const o = this.oleg;

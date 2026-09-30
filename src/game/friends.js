@@ -397,16 +397,8 @@ export class Friend extends Walker {
     if (!this.speak('quote', this.def.quotes[0])) this.speak(null, this.def.quotes[Math.floor(Math.random() * this.def.quotes.length)]);
   }
 
-  // sounds that come from what he is doing: coughing, vaping, reacting to a drink
+  // sounds that come from what he is doing: vaping, reacting to a drink
   sounds(dt) {
-    const coughing = ['cough', 'choke'].includes(this.animLoop());
-    if (coughing) {
-      this.coughT = (this.coughT ?? 0) - dt;
-      if (this.coughT <= 0 && !this.coughH?.playing) {
-        this.coughH = this.voice('cough');
-        this.coughT = rand(2.5, 5);
-      }
-    }
     const vaping = this.activity?.id === 'vape' && this.mode !== 'walk' && !this.problem;
     this.vapeRetry = (this.vapeRetry ?? 0) - dt;
     if (vaping && !this.vapeH?.playing && this.vapeRetry <= 0) {

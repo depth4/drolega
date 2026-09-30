@@ -52,6 +52,9 @@ export const TUNE = {
 
   bladder: { base: 0.6, waitMax: 15 },
 
+  // "Коч!" chain: someone yells, others pick it up with a fading chance
+  koch: { firstAfter: 25, every: [35, 60], chance: 0.85, decay: 0.8, max: 6, fun: 5, olegFun: 2, noise: 6 },
+
   // "Потрещать": he tells a recorded story; Oleg is stuck listening for `lock` of it (0.5 = first half)
   talk: { fun: 18, olegFun: 6, cooldown: 30, lock: 0.5 },
 
