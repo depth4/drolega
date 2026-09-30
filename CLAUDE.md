@@ -34,6 +34,6 @@ Browser 3D game (three.js + Vite, vanilla JS), a birthday gift. FNAF × Who's Yo
 URL params:
 - `?view=top` or `?view=orbit` opens the dollhouse view.
 - `?heads=box|sprite` picks the character style.
-- `?play` starts without pointer lock. Add `x`, `z`, `yaw`, `pitch` (degrees) to place Oleg, `t=SECONDS` to fast-forward the sim, `phone` to open the phone, `night=N` to pick a night.
+- `?play` starts without pointer lock. Add `x`, `z`, `yaw`, `pitch` (degrees) to place Oleg, `t=SECONDS` to fast-forward the sim, `phone` to open the phone, `night=N` to pick a night, `eye=METERS` to move the camera up (e.g. `eye=6&pitch=-89` for a close top-down look).
 
 `window.__game` and `window.__player` are exposed. Headless Chromium for screenshots is at `/opt/pw-browsers/chromium`; launch it with `--use-angle=swiftshader --enable-unsafe-swiftshader`. It renders at about 1–2 fps, so wait a few seconds between steps.

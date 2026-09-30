@@ -43,6 +43,7 @@ const hud = createHUD({ onBuy: (id) => game.buy(id) });
 window.__game = game; // handy in the console
 window.__player = player;
 window.__spots = SPOTS;
+window.__three = THREE; // debugging: raycasts from the console
 
 const orbit = new OrbitControls(orbitCam, canvas);
 orbit.target.set(CENTER.x, 0, CENTER.z);
@@ -310,6 +311,11 @@ started = false; // the menu offers "start", not "continue"
 player.update(0);
 if (params.has('x')) player.place(Number(params.get('x')), Number(params.get('z')), (Number(params.get('yaw')) || 0) * (Math.PI / 180));
 if (params.has('pitch')) player.pitch = (Number(params.get('pitch')) * Math.PI) / 180;
+if (params.has('eye')) {
+  // debug: look from any height (e.g. ?eye=6&pitch=-89 for a close top-down view); ceiling hidden above it
+  player.eye = Number(params.get('eye'));
+  apt.ceiling.visible = player.eye < 2.5;
+}
 if (params.get('view') === 'orbit' || params.get('view') === 'top') toOrbit();
 if (params.has('play')) {
   // screenshot/testing mode: run without pointer lock

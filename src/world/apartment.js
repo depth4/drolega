@@ -259,9 +259,9 @@ function buildDiagWall(group, d, wallMats, wpMat, colliders, doors) {
   const [d0, d1] = d.door.at;
   const t = d.t;
 
-  const pieces = [[0, d0, 0, H], [d1, len, 0, H], [d0, d1, d.door.top, H]];
+  const pieces = [[0, d0, 0, H], [d1, len, 0, H], [d0, d1, d.door.top, H]].filter(([s0, s1]) => s1 - s0 > 0.05);
   for (const [s0, s1, y0, y1] of pieces) group.add(new THREE.Mesh(place(boxGeo(s0, s1, y0, y1, -t / 2, t / 2)), wallMats));
-  for (const [s0, s1] of [[0, d0], [d1, len]]) {
+  for (const [s0, s1] of [[0, d0], [d1, len]].filter(([s0, s1]) => s1 - s0 > 0.05)) {
     colliders.push({ seg: [ax + ux * s0, az + uz * s0, ax + ux * s1, az + uz * s1], r: t / 2 });
   }
 
@@ -272,13 +272,15 @@ function buildDiagWall(group, d, wallMats, wpMat, colliders, doors) {
     if (!room?.wallpaper) continue;
     const height = room.wainscot ?? H;
     const scale = room.wallpaper === 'wallTile' ? 1 : 2;
-    const segs = [[0, d0, 0, height], [d1, len, 0, height]];
+    const segs = [[0, d0, 0, height], [d1, len, 0, height]].filter(([s0, s1]) => s1 - s0 > 0.05);
     if (height > d.door.top) segs.push([d0, d1, d.door.top, height]);
     for (const [s0, s1, y0, y1] of segs) {
-      const geo = new THREE.PlaneGeometry(s1 - s0, y1 - y0).translate((s0 + s1) / 2, (y0 + y1) / 2, 0);
-      worldUV(geo, scale);
+      // turn the back-side strip around BEFORE moving it along the wall, otherwise it lands mirrored
+      // on the other side of the corner (it used to stick out into the passage and the living room)
+      const geo = new THREE.PlaneGeometry(s1 - s0, y1 - y0);
       if (side < 0) geo.rotateY(Math.PI);
-      geo.translate(0, 0, side * (t / 2 + 0.004));
+      geo.translate((s0 + s1) / 2, (y0 + y1) / 2, side * (t / 2 + 0.004));
+      worldUV(geo, scale);
       group.add(new THREE.Mesh(place(geo), wpMat(room.wallpaper)));
     }
   }

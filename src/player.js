@@ -70,7 +70,7 @@ export class Player {
     const sway = d * d;
     this.camera.position.set(
       this.x + Math.sin(this.t * 0.9) * sway * 0.08,
-      EYE + bob + Math.sin(this.t * 1.4) * sway * 0.04,
+      (this.eye ?? EYE) + bob + Math.sin(this.t * 1.4) * sway * 0.04,
       this.z + Math.cos(this.t * 0.7) * sway * 0.08,
     );
     this.camera.rotation.set(
