@@ -139,7 +139,7 @@ h1 span { font-size: 0.5em; color: var(--ink-dim); }
 .mobile-note { margin: 0; color: var(--warn); font-size: 14px; }
 .controls { margin: 0; display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 8px 16px; font-size: 14px; }
 .controls div { display: flex; gap: 10px; min-width: 0; }
-.controls dt { font: 700 13px var(--mono); color: var(--lamp); min-width: 64px; }
+.controls dt { font: 700 13px var(--mono); color: var(--lamp); min-width: 76px; white-space: nowrap; }
 .controls dd { margin: 0; color: var(--ink-dim); }
 .stats { margin: 0; font: 14px var(--mono); color: var(--ink-dim); line-height: 1.6; }
 
