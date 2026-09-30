@@ -355,11 +355,11 @@ export class Game {
     this.dynamic.add(v.figure.root);
     this.visitor = v;
     this.alert('Стучат в дверь… (глянь в камеру: F)', 'Прихожая');
-    // the party reacts to the knocking (neighbours / police)
-    if (v.type === 'neighbor' || v.type === 'police') {
-      const t = this.furn.items.partyTable;
-      setTimeout(() => this.visitor === v && this.voices?.play('event_neighbors', { pos: [(t.x0 + t.x1) / 2, (t.z0 + t.z1) / 2] }), 1600);
-    }
+    // someone knocks: the whole party shuts up (voices stop, music goes quiet) and hushes each other
+    this.voices?.stopAll();
+    this.koch = null;
+    const t = this.furn.items.partyTable;
+    setTimeout(() => this.visitor === v && this.voices?.play('event_hush', { pos: [(t.x0 + t.x1) / 2, (t.z0 + t.z1) / 2] }), 400);
   }
 
   // Oleg listens to a story: stuck facing him for the first part of the clip
@@ -403,6 +403,7 @@ export class Game {
 
   kochTick(dt) {
     const K = TUNE.koch, st = this.state;
+    if (this.hushed) return;
     const pick = (a) => a[Math.floor(Math.random() * a.length)];
     if (!this.koch) {
       if (st.t < K.firstAfter) return;
@@ -426,6 +427,11 @@ export class Game {
       return;
     }
     this.kochShout(pick(pool));
+  }
+
+  // while someone is at the door the flat keeps quiet
+  get hushed() {
+    return !!this.visitor;
   }
 
   // somebody near Lyokha reacts to the vomit (not every time)
@@ -461,6 +467,9 @@ export class Game {
         st.anger += 1;
         st.music = false;
         st.neighborCd = TUNE.noise.cooldown;
+        // the moment the door opens: the hush stops, the neighbours get their reaction
+        this.voices?.stopAll();
+        this.voices?.play('event_neighbors');
         this.toast(`Соседка: «Сделайте потише!» Музыку выключили. Злость соседей: ${st.anger}`, 'warn');
       },
       onTimeout: () => {
@@ -712,7 +721,7 @@ export class Game {
     const N = TUNE.noise, src = N.sources;
     const has = (id) => this.friends.some((f) => f.problem?.id === id);
     let noise = 0;
-    if (st.music) noise += src.music;
+    if (st.music && !this.hushed) noise += src.music;
     if (has('cry')) noise += src.cry;
     if (has('puke')) noise += src.puke;
     if (has('smash')) noise += src.smash;

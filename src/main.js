@@ -274,7 +274,7 @@ function frame(now) {
       hud.lastTarget = target;
       hud.update(game, { roomName: roomAt(player.x, player.z)?.name, target, actions: currentActions });
     }
-    audio.setMusic(game.state.music);
+    audio.setMusic(game.state.music && !game.hushed); // the music goes quiet while someone knocks
     audio.voices.update([player.x, player.z]);
   } else {
     audio.setMusic(false);

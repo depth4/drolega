@@ -374,6 +374,7 @@ export class Friend extends Walker {
 
   // play one of his recorded clips (src/assets/voice/<id>_<kind>_N.mp3); the sound follows him
   voice(kind, opts = {}) {
+    if (this.game.hushed) return null; // someone is at the door: everybody keeps quiet
     return this.game.voices?.play(`${this.id}_${kind}`, { pos: () => this.pos, ...opts });
   }
 
@@ -399,7 +400,7 @@ export class Friend extends Walker {
 
   // sounds that come from what he is doing: vaping, reacting to a drink
   sounds(dt) {
-    const vaping = this.activity?.id === 'vape' && this.mode !== 'walk' && !this.problem;
+    const vaping = this.activity?.id === 'vape' && this.mode !== 'walk' && !this.problem && !this.game.hushed;
     this.vapeRetry = (this.vapeRetry ?? 0) - dt;
     if (vaping && !this.vapeH?.playing && this.vapeRetry <= 0) {
       this.vapeH = this.voice('vapeloop', { loop: true, gain: 0.8 });
