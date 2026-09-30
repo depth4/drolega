@@ -1,9 +1,12 @@
 // Faces of the guys. A photo (cropped to the face, normalized x, y, w, h) or a drawn placeholder.
 // To add someone's face: drop a photo into src/assets/faces/ and add it here.
 import kirill from '../assets/faces/kirill.png?inline';
+import lyokhaSheet from '../assets/skins/lyokha.png?inline';
 
 const PHOTOS = {
   kirill: { src: kirill, crop: [0.16, 0.0, 0.74, 0.8], w: 449, h: 600 },
+  // cartoon head from his skin sheet until there's a photo; white sheet background keyed out
+  lyokha: { src: lyokhaSheet, crop: [73 / 600, 40 / 334, 46 / 600, 52 / 334], w: 600, h: 334, keyWhite: true },
 };
 
 const cache = {};
@@ -40,7 +43,15 @@ export function drawFace(ctx, id, { skin, hair }, x, y, w, h, onReady, { cutout 
       const { naturalWidth: iw, naturalHeight: ih } = photo.img;
       ctx.clearRect(x, y, w, h);
       ctx.drawImage(photo.img, cx * iw, cy * ih, cw * iw, ch * ih, x, y, w, h);
-      if (cutout) return;
+      if (cutout) {
+        if (PHOTOS[id].keyWhite) {
+          const px = ctx.getImageData(x, y, w, h);
+          const d = px.data;
+          for (let i = 0; i < d.length; i += 4) if (d[i] > 235 && d[i + 1] > 235 && d[i + 2] > 235) d[i + 3] = 0;
+          ctx.putImageData(px, x, y);
+        }
+        return;
+      }
       // cut-out photo: fill the see-through / whitish background with the hair colour
       const [hr, hg, hb] = [1, 3, 5].map((i) => parseInt(hair.slice(i, i + 2), 16));
       const px = ctx.getImageData(x, y, w, h);

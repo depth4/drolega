@@ -119,7 +119,7 @@ export const CHARS = {
     },
   },
   lyokha: {
-    name: 'Лёха', shirt: '#3f7d3a', hair: '#6b4a2a',
+    name: 'Лёха', shirt: '#1e1e20', pants: '#1c1c1e', hair: '#a07a50', // clothes come from src/assets/skins/lyokha.png
     start: 'table2', prefs: { table: 6, sofa: 2, kitchen: 1 }, drinker: true,
     tick(f, g) {
       if (!f.problem && !f.wasted && f.mode !== 'walk' && f.drunk >= TUNE.lyokha.wastedAt) startWasted(f, g);

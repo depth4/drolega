@@ -3,6 +3,7 @@
 import * as THREE from 'three';
 import { mat } from './apartment.js';
 import { drawFace, faceAspect } from './faces.js';
+import { skinMaterials } from './skins.js';
 
 export function textSprite(text, { bg = 'rgba(20,18,24,0.78)', fg = '#fff', size = 40, scale = 0.001 } = {}) {
   const c = document.createElement('canvas');
@@ -104,23 +105,25 @@ function makeBoxPerson(opts) {
   root.add(body);
   const m = { shirt: mat(shirt, { roughness: 0.9 }), pants: mat(pants, { roughness: 0.9 }), skin: mat(skin, { roughness: 0.7 }), hair: mat(hair) };
 
+  const sk = skinMaterials(opts.faceId); // clothes from a skin sheet, if this guy has one
+
   const hips = new THREE.Group();
   hips.position.y = 0.82;
   body.add(hips);
   const legs = new THREE.Group();
   hips.add(legs);
-  for (const x of [-0.09, 0.09]) {
-    const leg = new THREE.Mesh(new THREE.BoxGeometry(0.13, 0.82, 0.15).translate(0, -0.41, 0), m.pants);
+  for (const [i, x] of [-0.09, 0.09].entries()) {
+    const leg = new THREE.Mesh(new THREE.BoxGeometry(0.13, 0.82, 0.15).translate(0, -0.41, 0), sk?.legs[i] ?? m.pants);
     leg.position.x = x;
     legs.add(leg);
   }
-  const torso = new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.62, 0.26).translate(0, 0.31, 0), m.shirt);
+  const torso = new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.62, 0.26).translate(0, 0.31, 0), sk?.torso ?? m.shirt);
   hips.add(torso);
   const arms = [];
   for (const side of [-1, 1]) {
     const arm = new THREE.Group();
     arm.position.set(side * 0.27, 0.58, 0);
-    arm.add(new THREE.Mesh(new THREE.BoxGeometry(0.11, 0.6, 0.13).translate(0, -0.3, 0), m.shirt));
+    arm.add(new THREE.Mesh(new THREE.BoxGeometry(0.11, 0.6, 0.13).translate(0, -0.3, 0), sk?.arm ?? m.shirt));
     arm.add(new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.1, 0.1).translate(0, -0.64, 0), m.skin));
     hips.add(arm);
     arms.push(arm);
@@ -138,7 +141,9 @@ function makeBoxPerson(opts) {
   } else {
     // cube head: face on the front (+z), hair on top and back
     const face = new THREE.MeshStandardMaterial({ map: faceTexture({ ...opts, skin, hair }), roughness: 0.8 });
-    const head = new THREE.Mesh(new THREE.BoxGeometry(0.32, 0.36, 0.3).translate(0, 0.2, 0), [m.skin, m.skin, m.hair, m.skin, face, m.hair]);
+    const h = sk?.head;
+    const mats = h ? [h.sides[0], h.sides[1], h.top, m.skin, h.front, h.back] : [m.skin, m.skin, m.hair, m.skin, face, m.hair];
+    const head = new THREE.Mesh(new THREE.BoxGeometry(0.32, 0.36, 0.3).translate(0, 0.2, 0), mats);
     head.position.y = 0.64;
     hips.add(head);
   }

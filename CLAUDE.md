@@ -16,6 +16,7 @@ Browser 3D game (three.js + Vite, vanilla JS), a birthday gift. FNAF × Who's Yo
 - `src/world/apartment.js` builds walls with openings, wallpaper linings (only where a wall face exists), floors, windows, and the hinged doors (`doors.balcony/bath/entrance`).
 - `src/world/furniture.js`: each item is built in a local frame (u along the wall, v from the wall to the front, y up). Colliders come from layout footprints.
 - `src/world/faces.js` maps each guy to a face photo in `src/assets/faces/` (with a crop) or draws a placeholder face. Voices live in `src/assets/voice/` and are played via `sfx.voice(id)`.
+- `src/world/skins.js` puts clothes from an unfolded skin sheet (`src/assets/skins/`, Minecraft/Roblox-style front/back/side views) onto the box body; pieces are pixel rects on the sheet.
 - `src/world/figures.js` has the people in two styles (`box`: cube heads with the face on the front, `sprite`: the same 3D body with a flat Doom-style billboard head that always faces the camera; toggled in the menu or with `?heads=box|sprite`), the cat, name sprites, puddles, toy, bottles, and broken marks. `textures.js` has procedural canvas textures (no image assets).
 - `src/game/friends.js` has the characters: activities, problems, and the actions Oleg can take on them. `game.js` runs the night: meters, noise and neighbours, visitors and courier, stove, grill, inventory, and the interactable targets.
 - `src/config.js` holds **all balance numbers**. Tune there, not in code.
@@ -25,7 +26,7 @@ Browser 3D game (three.js + Vite, vanilla JS), a birthday gift. FNAF × Who's Yo
 
 - Interactable = any Object3D with `userData.target = { name, info?(), actions() -> [{ key: 'E'|'R'|'T', text, run }] }`.
 - Keys are read via `e.code`, so a Russian keyboard layout works.
-- Textures are canvas-generated and sounds are synthesized. The only real assets are in `src/assets/` (birthday paintings, face photos, voices); they are imported with `?inline`, so the build stays a single page with no extra requests.
+- Textures are canvas-generated and sounds are synthesized. The only real assets are in `src/assets/` (birthday paintings, face photos, skin sheets, voices); they are imported with `?inline`, so the build stays a single page with no extra requests.
 
 ## Debugging
 
