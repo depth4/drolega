@@ -25,7 +25,7 @@ Browser 3D game (three.js + Vite, vanilla JS), a birthday gift. FNAF × Who's Yo
 
 - Interactable = any Object3D with `userData.target = { name, info?(), actions() -> [{ key: 'E'|'R'|'T', text, run }] }`.
 - Keys are read via `e.code`, so a Russian keyboard layout works.
-- No external assets: textures are canvas-generated and sounds are WebAudio.
+- Textures are canvas-generated and sounds are synthesized. The only real assets are in `src/assets/` (birthday paintings, face photos, voices); they are imported with `?inline`, so the build stays a single page with no extra requests.
 
 ## Debugging
 
