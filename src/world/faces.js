@@ -112,8 +112,8 @@ for (const [path, src] of Object.entries(FILES)) {
 }
 
 export const hasMoodFaces = (who) => !!STATES[who];
-// best available state for this guy (falls back to default)
-export const moodState = (who, state) => (STATES[who]?.[state] ? state : 'default');
+// best available picture for this state: the state itself, else default, else null (use the old photo)
+export const moodState = (who, state) => (STATES[who]?.[state] ? state : STATES[who]?.default ? 'default' : null);
 
 const cuts = {};
 // { canvas, aspect, ready, then(fn) }: the cut-out head, processed once and shared

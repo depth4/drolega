@@ -117,11 +117,11 @@ function makeBoxPerson(opts) {
   if (opts.style === 'sprite') {
     // Doom-style head: a flat cut-out face that always turns to the camera
     const aspect = faceAspect(who);
-    const tex = mood ? new THREE.Texture() : faceTexture({ ...opts, skin, hair }, { w: 256, h: Math.round(256 / aspect), cutout: true });
+    const tex = faceTexture({ ...opts, skin, hair }, { w: 256, h: Math.round(256 / aspect), cutout: true });
     head = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, transparent: true, alphaTest: 0.1 }));
     head.scale.set(HH * aspect, HH, 1);
     head.center.set(0.5, 0);
-    head.position.y = mood ? -0.07 : -0.01; // mood heads include the neck: overlap ours
+    head.position.y = -0.01;
     rig.neck.add(head);
   } else {
     // cube head: face on the front (+z), hair on top and back
@@ -132,13 +132,27 @@ function makeBoxPerson(opts) {
     rig.neck.add(head);
   }
 
+  // the photo / drawn face, used for moods that have no picture yet
+  const legacy = { map: head.isSprite ? head.material.map : faceMat.map, aspect: faceAspect(who) };
   const moodTex = {};
-  let faceState = null;
+  let faceState;
   const setFace = (state) => {
     if (!mood) return;
     state = moodState(who, state);
     if (state === faceState) return;
     faceState = state;
+    if (!state) {
+      if (head.isSprite) {
+        head.material.map = legacy.map;
+        head.material.needsUpdate = true;
+        head.scale.set(HH * legacy.aspect, HH, 1);
+        head.position.y = -0.01;
+      } else {
+        faceMat.map = legacy.map;
+        faceMat.needsUpdate = true;
+      }
+      return;
+    }
     moodFace(who, state).then((f) => {
       if (faceState !== state) return;
       if (!moodTex[state]) {
@@ -161,6 +175,7 @@ function makeBoxPerson(opts) {
         head.material.map = moodTex[state];
         head.material.needsUpdate = true;
         head.scale.set(HH * f.aspect, HH, 1);
+        head.position.y = -0.07; // mood heads include the neck: overlap ours
       } else {
         faceMat.map = moodTex[state];
         faceMat.needsUpdate = true;
