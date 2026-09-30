@@ -28,6 +28,7 @@ class Walker {
     this.path = null;
     this.mode = 'idle';
     this.spot = null;
+    this.heading = 0;
     this.t = Math.random() * 10;
   }
   get room() {
@@ -42,9 +43,18 @@ class Walker {
   arrive(spot) {
     this.y = spot.y ?? 0;
     this.figure.setPose?.(spot.pose ?? 'stand', this.y);
+    if (spot.look) this.heading = Math.atan2(spot.look[0] - this.pos[0], spot.look[1] - this.pos[1]);
+    this.applyTransform();
+  }
+  // point `dist` meters in front of him
+  front(dist) {
+    return [this.pos[0] + Math.sin(this.heading) * dist, this.pos[1] + Math.cos(this.heading) * dist];
+  }
+  // put the figure where the walker is; ox/oz/yaw = visual wobble on top (drunk)
+  applyTransform(ox = 0, oz = 0, yaw = 0) {
     const root = this.figure.root;
-    root.position.set(this.pos[0], spot.pose ? 0 : this.y, this.pos[1]);
-    if (spot.look) root.rotation.y = Math.atan2(spot.look[0] - this.pos[0], spot.look[1] - this.pos[1]);
+    root.position.set(this.pos[0] + ox, this.spot?.pose || this.mode === 'walk' ? 0 : this.y, this.pos[1] + oz);
+    root.rotation.y = this.heading + yaw;
   }
   walkTo(spot, onArrive, blocked) {
     const r = route(this.node, this.pos, spot.node, spot.p, blocked);
@@ -75,11 +85,10 @@ class Walker {
       } else {
         this.pos[0] += (dx / d) * step;
         this.pos[1] += (dz / d) * step;
-        this.figure.root.rotation.y = Math.atan2(dx, dz);
+        this.heading = Math.atan2(dx, dz);
         step = 0;
       }
     }
-    this.figure.root.position.set(this.pos[0], 0, this.pos[1]);
     if (!this.path.length) {
       this.mode = 'idle';
       this.node = this.target.node;
@@ -203,7 +212,8 @@ const PROBLEMS = {
         t += dt;
         if (t >= TUNE.lyokha.pukeEvery && f.mode !== 'walk') {
           t = 0;
-          g.addPuddle(f.pos[0] + rand(-0.4, 0.4), f.pos[1] + rand(-0.4, 0.4));
+          const [x, z] = f.front(0.55);
+          g.addPuddle(x + rand(-0.12, 0.12), z + rand(-0.12, 0.12));
         }
       },
       actions: () => showerActions(f, g),
@@ -324,7 +334,8 @@ function startWasted(f, g) {
   f.endActivity(true);
   const kind = pickWeighted([['puke', 0.45], ['sleepTub', 0.25], ['smash', 0.3]]);
   if (kind === 'puke') {
-    g.addPuddle(f.pos[0] + rand(-0.3, 0.3), f.pos[1] + rand(-0.3, 0.3));
+    const [x, z] = f.front(0.5);
+    g.addPuddle(x, z);
     f.setProblem(PROBLEMS.puke(f, g));
     f.walkTo(SPOTS.bathStand);
   } else if (kind === 'sleepTub') {
@@ -350,6 +361,7 @@ export class Friend extends Walker {
     this.problem = null;
     this.wasted = false;
     this.talkCooldown = 0;
+    this.seed = Math.random() * 10;
     this.figure.root.userData.friend = this;
     const spot = SPOTS[def.start];
     this.place(spot);
@@ -360,6 +372,7 @@ export class Friend extends Walker {
   // a catchphrase in a speech bubble (+ the recorded voice, louder when Oleg is close)
   speak(text = this.def.quotes[Math.floor(Math.random() * this.def.quotes.length)]) {
     this.figure.say(text);
+    if (/сук/i.test(text)) this.figure.play('shout');
     if (this.def.voice) {
       const [ox, oz] = this.game.olegPos;
       const d = Math.hypot(ox - this.pos[0], oz - this.pos[1]);
@@ -367,11 +380,58 @@ export class Friend extends Walker {
     }
   }
 
-  drink(d, buzzTime = 0) {
-    this.figure.sip(2.2);
+  drink(d, buzzTime = 0, kind = 'beer') {
+    this.figure.sip(2.4, kind);
     this.fun += d.fun;
     this.drunk = clamp(this.drunk + d.drunk * (TUNE.drunkMult[this.id] ?? 1));
     if (buzzTime) this.buzz = Math.max(this.buzz ?? 0, buzzTime);
+  }
+
+  // what the body is doing right now (clip names from world/anim.js)
+  animLoop() {
+    if (this.debugLoop !== undefined) return this.debugLoop; // console testing: f.debugLoop = 'puke'
+    const pid = this.problem?.id;
+    if (this.mode === 'walk') return pid === 'smash' ? 'smashWalk' : pid === 'puke' ? 'holdMouth' : null;
+    const byProblem = { hog: 'chug', cry: 'cry', puke: 'puke', sleepTub: 'sleep', sleep: 'sleep', smash: 'smash', grillOut: 'wave', smoke: 'choke', cough: 'cough', waitToilet: 'needToilet' };
+    if (byProblem[pid]) return byProblem[pid];
+    const act = this.activity?.id;
+    const byActivity = { grill: 'grill', anime: 'phone', vape: 'vape' };
+    if (byActivity[act]) return byActivity[act];
+    if (this.game.state.music && this.room?.id === 'living') return this.figure.pose === 'sit' ? 'seatDance' : 'dance';
+    return null;
+  }
+
+  // face picture: busy with his thing, otherwise by how much fun he has
+  faceState() {
+    if (this.problem && ['cry', 'puke', 'sleep', 'cough'].includes(this.problem.id)) return this.problem.id; // if there's a picture
+    if (!this.problem && ['grill', 'anime', 'vape'].includes(this.activity?.id) && this.mode !== 'walk') return 'doing';
+    if (this.fun <= 3) return 'sad';
+    if (this.fun < 30) return 'angry';
+    if (this.fun > 70) return 'happy';
+    return 'default';
+  }
+
+  animate(dt) {
+    const d = this.drunk / 100;
+    const loop = this.animLoop();
+    this.figure.setLoop(loop);
+    this.figure.setFace?.(this.faceState());
+    // small random gestures so nobody stands like a statue
+    if (!this.problem && this.mode !== 'walk' && this.figure.pose !== 'lie' && (!loop || loop === 'dance' || loop === 'seatDance') && !this.figure.busy) {
+      this.ambientT = (this.ambientT ?? rand(2, 6)) - dt;
+      if (this.ambientT <= 0) {
+        this.ambientT = rand(3.5, 8);
+        const opts = [['talk', 3], ['lookAround', 2], ['scratch', 1]];
+        if (this.fun > 65) opts.push(['laugh', 3]);
+        this.figure.play(pickWeighted(opts));
+      }
+    }
+    // drunk walking: weaving from side to side, the body turning with it
+    const walk = this.mode === 'walk';
+    const n = Math.sin(this.t * 1.3 + this.seed) * 0.6 + Math.sin(this.t * 2.9 + this.seed * 2) * 0.4;
+    const lat = walk ? 0.17 * d * n : 0;
+    this.applyTransform(Math.cos(this.heading) * lat, -Math.sin(this.heading) * lat, walk ? 0.35 * d * Math.sin(this.t * 2.1 + this.seed) : 0);
+    this.figure.update(dt, { walking: walk && !(this.lurch > 0), speed: this.speed, drunk: d, music: this.game.state.music });
   }
 
   get statusText() {
@@ -463,8 +523,15 @@ export class Friend extends Walker {
       this.problem.tick?.(dt);
     }
 
-    if (this.mode === 'walk') this.stepWalk(dt);
-    else if (this.activity) this.tickActivity(dt);
+    if (this.mode === 'walk') {
+      // drunk: stumbles now and then, and the pace keeps changing
+      const d = this.drunk / 100;
+      if (this.lurch > 0) this.lurch -= dt;
+      else if (d > 0.4 && chance(0.12 * d, dt)) {
+        this.lurch = 0.8;
+        this.figure.play('stumble');
+      } else this.stepWalk(dt * (1 - 0.35 * d * (0.5 + 0.5 * Math.sin(this.t * 1.9))));
+    } else if (this.activity) this.tickActivity(dt);
     else if (!this.problem) {
       this.leaveSoon = (this.leaveSoon ?? 0) - dt;
       if (this.leaveSoon <= 0) this.chooseNext();
@@ -476,7 +543,7 @@ export class Friend extends Walker {
       this.quoteT = rand(30, 55);
       if (!this.problem) this.speak();
     }
-    this.figure.animate(this.t, this.mode === 'walk', this.drunk / 100, dt);
+    this.animate(dt);
   }
 
   tickActivity(dt) {
@@ -495,7 +562,7 @@ export class Friend extends Walker {
         const kind = tb.beer > 0 && tb.vodka > 0 ? (Math.random() < 0.5 ? 'beer' : 'vodka') : tb.beer > 0 ? 'beer' : tb.vodka > 0 ? 'vodka' : null;
         if (kind) {
           tb[kind] -= 1;
-          this.drink(D[kind], D[kind].buzzTime);
+          this.drink(D[kind], D[kind].buzzTime, kind);
           this.bladder += 12;
         } else if (this.def.needsBooze !== false) {
           this.fun -= D.noBooze * every;
@@ -506,6 +573,7 @@ export class Friend extends Walker {
         a.plateT = 0;
         if (g.state.table.food > 0) {
           g.state.table.food -= 1;
+          this.figure.play('eat');
           this.fun += D.plate.fun;
           this.drunk = clamp(this.drunk + D.plate.drunk);
         }
@@ -569,7 +637,7 @@ export class Friend extends Walker {
           run: () => {
             if (!this.def.drinker) return g.toast(`${this.name} не пьёт`, 'info');
             g.inv.consume();
-            this.drink(TUNE.give[item], TUNE.give[item].buzzTime);
+            this.drink(TUNE.give[item], TUNE.give[item].buzzTime, item);
             this.bladder += 15;
           },
         });
@@ -578,6 +646,7 @@ export class Friend extends Walker {
           key: 'E', text: 'Накормить',
           run: () => {
             g.inv.consume();
+            this.figure.play('eat');
             this.fun += TUNE.give.food.fun;
             this.drunk = clamp(this.drunk + TUNE.give.food.drunk);
           },
@@ -590,6 +659,7 @@ export class Friend extends Walker {
             this.fun += 4;
             g.oleg.fun += 2;
             this.talkCooldown = 8;
+            this.figure.play(this.fun > 60 ? 'laugh' : 'talk');
           },
         });
       }
@@ -674,6 +744,7 @@ export class Cat extends Walker {
       if (this.idleLeft <= 0) this.wander();
     }
     this.fun = clamp(this.fun);
+    this.applyTransform();
     this.figure.animate(this.t, this.mode === 'walk');
   }
 

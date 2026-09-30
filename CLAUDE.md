@@ -19,6 +19,8 @@ Browser 3D game (three.js + Vite, vanilla JS), a birthday gift. FNAF × Who's Yo
 - `docs/FACES.md` is the face-picture plan: an action shot per state (head + hands + props, like Kirill drinking), optional second frame for a 2-frame loop (`<who>_<action>[_2].png`), Qwen prompt, priorities.
 - `src/world/faces.js` maps each guy to a face photo in `src/assets/faces/` (with a crop) or draws a placeholder face. Voices live in `src/assets/voice/` and are played via `sfx.voice(id)`.
 - `src/world/skins.js` puts clothes from an unfolded skin sheet (`src/assets/skins/`, Minecraft/Roblox-style front/back/side views) onto the box body; pieces are pixel rects on the sheet.
+- `src/world/anim.js` is the body: rig (pelvis, spine, neck, hips/knees, shoulders/elbows, hands with props), layered clips (base walk/idle/sit/lie → loop → one-shot → drunk layer), two-bone IK to named anchors (mouth, eye, knee, hair...), all smoothed. `friends.js` picks the clip in `Friend.animLoop()` and the face in `faceState()`; one-shots via `figure.play('drink'|'eat'|'talk'|...)`. `particles.js`: vomit, tears, vapor, smoke, Z.
+- Mood faces: any `src/assets/faces/<who>_<state>.(png|jpg|webp)` is picked up automatically (`import.meta.glob`), white background flood-filled away and auto-cropped (`faces.js`).
 - `src/world/figures.js` has the people in two styles (`box`: cube heads with the face on the front, `sprite`: the same 3D body with a flat Doom-style billboard head that always faces the camera; toggled in the menu or with `?heads=box|sprite`), the cat, name sprites, puddles, toy, bottles, and broken marks. `textures.js` has procedural canvas textures (no image assets).
 - `src/game/friends.js` has the characters: activities, problems, and the actions Oleg can take on them. `game.js` runs the night: meters, noise and neighbours, visitors and courier, stove, grill, inventory, and the interactable targets.
 - `src/config.js` holds **all balance numbers**. Tune there, not in code.
@@ -37,4 +39,4 @@ URL params:
 - `?heads=box|sprite` picks the character style.
 - `?play` starts without pointer lock. Add `x`, `z`, `yaw`, `pitch` (degrees) to place Oleg, `t=SECONDS` to fast-forward the sim, `phone` to open the phone, `night=N` to pick a night, `eye=METERS` to move the camera up (e.g. `eye=6&pitch=-89` for a close top-down look).
 
-`window.__game` and `window.__player` are exposed. Headless Chromium for screenshots is at `/opt/pw-browsers/chromium`; launch it with `--use-angle=swiftshader --enable-unsafe-swiftshader`. It renders at about 1–2 fps, so wait a few seconds between steps.
+`window.__game`, `window.__player`, `window.__spots`, `window.__three` are exposed. Force a clip on a friend with `f.debugLoop = 'puke'` (null = none, delete to go back to normal). Headless Chromium for screenshots is at `/opt/pw-browsers/chromium`; launch it with `--use-angle=swiftshader --enable-unsafe-swiftshader`. It renders at about 1–2 fps, so wait a few seconds between steps.

@@ -99,3 +99,96 @@ export function drawFace(ctx, id, { skin, hair }, x, y, w, h, onReady, { cutout 
   draw();
   if (photo && !photo.ready) photo.waiters.push(() => (draw(), onReady?.()));
 }
+
+// ---------- mood faces: src/assets/faces/<who>_<state>.(png|jpg|webp) ----------
+// States: default, happy, angry, sad, doing (+ anything else, e.g. cry, looked up by name).
+// Generated heads on a white background: the background is removed by flood fill from the
+// edges (so the whites of the eyes stay), then the picture is cropped to the head.
+const FILES = import.meta.glob('../assets/faces/*_*.{png,jpg,jpeg,webp}', { eager: true, query: '?inline', import: 'default' });
+const STATES = {};
+for (const [path, src] of Object.entries(FILES)) {
+  const m = path.match(/\/([a-z]+)_([a-z]+)\.\w+$/);
+  if (m) (STATES[m[1]] ??= {})[m[2]] = src;
+}
+
+export const hasMoodFaces = (who) => !!STATES[who];
+// best available state for this guy (falls back to default)
+export const moodState = (who, state) => (STATES[who]?.[state] ? state : 'default');
+
+const cuts = {};
+// { canvas, aspect, ready, then(fn) }: the cut-out head, processed once and shared
+export function moodFace(who, state) {
+  const key = `${who}_${state}`;
+  if (cuts[key]) return cuts[key];
+  const entry = { canvas: null, aspect: 0.65, ready: false, waiters: [], then(fn) { this.ready ? fn(this) : this.waiters.push(fn); } };
+  cuts[key] = entry;
+  const src = STATES[who]?.[state];
+  if (!src) return entry;
+  const img = new Image();
+  img.onload = () => {
+    const c = cutOut(img);
+    entry.canvas = c;
+    entry.aspect = c.width / c.height;
+    entry.ready = true;
+    entry.waiters.forEach((fn) => fn(entry));
+  };
+  img.src = src;
+  return entry;
+}
+
+function cutOut(img) {
+  const scale = Math.min(1, 800 / Math.max(img.naturalWidth, img.naturalHeight));
+  const w = Math.round(img.naturalWidth * scale), h = Math.round(img.naturalHeight * scale);
+  const c = document.createElement('canvas');
+  c.width = w;
+  c.height = h;
+  const g = c.getContext('2d', { willReadFrequently: true });
+  g.drawImage(img, 0, 0, w, h);
+  const px = g.getImageData(0, 0, w, h);
+  const d = px.data;
+  const isBg = (i) => {
+    if (d[i + 3] < 30) return true;
+    const r = d[i], gg = d[i + 1], b = d[i + 2];
+    return r > 218 && gg > 218 && b > 218 && Math.max(r, gg, b) - Math.min(r, gg, b) < 28;
+  };
+  const seen = new Uint8Array(w * h);
+  const stack = [];
+  const push = (x, y) => {
+    const k = y * w + x;
+    if (!seen[k] && isBg(k * 4)) {
+      seen[k] = 1;
+      stack.push(k);
+    }
+  };
+  for (let x = 0; x < w; x++) push(x, 0), push(x, h - 1);
+  for (let y = 0; y < h; y++) push(0, y), push(w - 1, y);
+  while (stack.length) {
+    const k = stack.pop();
+    const x = k % w, y = (k / w) | 0;
+    if (x > 0) push(x - 1, y);
+    if (x < w - 1) push(x + 1, y);
+    if (y > 0) push(x, y - 1);
+    if (y < h - 1) push(x, y + 1);
+  }
+  let x0 = w, y0 = h, x1 = 0, y1 = 0;
+  for (let k = 0; k < w * h; k++) {
+    if (seen[k]) {
+      d[k * 4 + 3] = 0;
+      continue;
+    }
+    // soften the edge: a pixel touching the background gets half alpha
+    const x = k % w, y = (k / w) | 0;
+    if ((x > 0 && seen[k - 1]) || (x < w - 1 && seen[k + 1]) || (y > 0 && seen[k - w]) || (y < h - 1 && seen[k + w])) d[k * 4 + 3] = 140;
+    if (x < x0) x0 = x;
+    if (x > x1) x1 = x;
+    if (y < y0) y0 = y;
+    if (y > y1) y1 = y;
+  }
+  g.putImageData(px, 0, 0);
+  if (x1 <= x0 || y1 <= y0) return c;
+  const out = document.createElement('canvas');
+  out.width = x1 - x0 + 1;
+  out.height = y1 - y0 + 1;
+  out.getContext('2d').drawImage(c, x0, y0, out.width, out.height, 0, 0, out.width, out.height);
+  return out;
+}

@@ -5,6 +5,7 @@ import { TUNE } from '../config.js';
 import { FURNITURE, TOY_SPOTS, VISITOR_SPOT, CAT_SPOTS, roomAt } from '../world/layout.js';
 import { makePerson, makePuddle, makeToy, makeBottle, makePlate, makeBrokenMark } from '../world/figures.js';
 import { Friend, Cat, clamp, rand } from './friends.js';
+import { particles } from '../world/particles.js';
 
 export const ITEMS = {
   beer: { name: 'Пиво', icon: '🍺' },
@@ -68,6 +69,7 @@ export class Game {
     this.sfx = sfx;
     this.dynamic = new THREE.Group();
     scene.add(this.dynamic);
+    particles.attach(scene);
     this.toasts = [];
     this.toastKeys = {};
     this.onEnd = null;
@@ -141,6 +143,7 @@ export class Game {
     this.pending = [];
     this.stove = { phase: 'idle', t: 0 };
     this.grill = { lit: false, heat: 0 };
+    particles.clear();
     for (const p of this.puddles ?? []) this.dynamic.remove(p);
     this.puddles = [];
     for (const it of Object.values(this.furn.items)) this.setBroken(it, false);
@@ -574,6 +577,7 @@ export class Game {
     }
 
     for (const f of this.friends) f.update(dt);
+    particles.update(dt);
     this.cat.update(dt);
     for (const d of Object.values(this.doors)) d.update(dt);
     if (this.entranceCloseT > 0) {
@@ -657,7 +661,9 @@ export class Game {
       if (v.knockT <= 0) {
         v.knockT = TUNE.visitors.knockEvery;
         this.sfx.knock();
+        v.figure.play('knock');
       }
+      v.figure.update(dt);
       if (v.left <= 0) {
         this.dismissVisitor();
         v.onTimeout();

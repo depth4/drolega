@@ -2,7 +2,8 @@
 // People face local +z (Object3D.lookAt points +z at the target).
 import * as THREE from 'three';
 import { mat } from './apartment.js';
-import { drawFace, faceAspect } from './faces.js';
+import { drawFace, faceAspect, hasMoodFaces, moodState, moodFace } from './faces.js';
+import { createRig } from './anim.js';
 import { skinMaterials } from './skins.js';
 
 export function textSprite(text, { bg = 'rgba(20,18,24,0.78)', fg = '#fff', size = 40, scale = 0.001 } = {}) {
@@ -100,55 +101,73 @@ function faceTexture(opts, { w = 128, h = 128, cutout = false } = {}) {
 
 function makeBoxPerson(opts) {
   const { name, shirt, pants = '#2b2f3a', skin = '#e2b594', hair = '#3b2a1e', label = true } = opts;
+  const who = opts.faceId;
   const root = new THREE.Group();
   const body = new THREE.Group();
   root.add(body);
   const m = { shirt: mat(shirt, { roughness: 0.9 }), pants: mat(pants, { roughness: 0.9 }), skin: mat(skin, { roughness: 0.7 }), hair: mat(hair) };
+  const sk = skinMaterials(who); // clothes from a skin sheet, if this guy has one
+  const rig = createRig(body, { m, sk, style: opts.style });
+  const arms = rig.arms.map((a) => a.shoulder);
 
-  const sk = skinMaterials(opts.faceId); // clothes from a skin sheet, if this guy has one
-
-  const hips = new THREE.Group();
-  // real-life proportions: ~1.75 m tall, ~48 cm across the shoulders, head ~23 cm
-  hips.position.y = 0.86;
-  body.add(hips);
-  const legs = new THREE.Group();
-  hips.add(legs);
-  for (const [i, x] of [-0.07, 0.07].entries()) {
-    const leg = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.86, 0.14).translate(0, -0.43, 0), sk?.legs[i] ?? m.pants);
-    leg.position.x = x;
-    legs.add(leg);
-  }
-  const torso = new THREE.Mesh(new THREE.BoxGeometry(0.36, 0.56, 0.21).translate(0, 0.28, 0), sk?.torso ?? m.shirt);
-  hips.add(torso);
-  const arms = [];
-  for (const side of [-1, 1]) {
-    const arm = new THREE.Group();
-    arm.position.set(side * 0.225, 0.54, 0);
-    arm.add(new THREE.Mesh(new THREE.BoxGeometry(0.09, 0.56, 0.1).translate(0, -0.28, 0), sk?.arm ?? m.shirt));
-    arm.add(new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.08, 0.08).translate(0, -0.6, 0), m.skin));
-    hips.add(arm);
-    arms.push(arm);
-  }
-  let head;
+  // ---- head: mood pictures (<who>_<state>) if he has them, otherwise the photo / drawn face
+  const mood = hasMoodFaces(who);
+  let head, faceMat = null;
+  const HH = 0.5; // big on purpose: the faces are the point
   if (opts.style === 'sprite') {
     // Doom-style head: a flat cut-out face that always turns to the camera
-    const aspect = faceAspect(opts.faceId);
-    const tex = faceTexture({ ...opts, skin, hair }, { w: 256, h: Math.round(256 / aspect), cutout: true });
+    const aspect = faceAspect(who);
+    const tex = mood ? new THREE.Texture() : faceTexture({ ...opts, skin, hair }, { w: 256, h: Math.round(256 / aspect), cutout: true });
     head = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, transparent: true, alphaTest: 0.1 }));
-    const hh = 0.5; // big on purpose: the faces are the point
-    head.scale.set(hh * aspect, hh, 1);
+    head.scale.set(HH * aspect, HH, 1);
     head.center.set(0.5, 0);
-    head.position.y = 0.55;
-    hips.add(head);
+    head.position.y = mood ? -0.07 : -0.01; // mood heads include the neck: overlap ours
+    rig.neck.add(head);
   } else {
     // cube head: face on the front (+z), hair on top and back
-    const face = new THREE.MeshStandardMaterial({ map: faceTexture({ ...opts, skin, hair }), roughness: 0.8 });
+    faceMat = new THREE.MeshStandardMaterial({ map: faceTexture({ ...opts, skin, hair }), roughness: 0.8 });
     const h = sk?.head;
-    const mats = h ? [h.sides[0], h.sides[1], h.top, m.skin, h.front, h.back] : [m.skin, m.skin, m.hair, m.skin, face, m.hair];
+    const mats = h ? [h.sides[0], h.sides[1], h.top, m.skin, h.front, h.back] : [m.skin, m.skin, m.hair, m.skin, faceMat, m.hair];
     head = new THREE.Mesh(new THREE.BoxGeometry(0.32, 0.36, 0.3).translate(0, 0.2, 0), mats);
-    head.position.y = 0.56;
-    hips.add(head);
+    rig.neck.add(head);
   }
+
+  const moodTex = {};
+  let faceState = null;
+  const setFace = (state) => {
+    if (!mood) return;
+    state = moodState(who, state);
+    if (state === faceState) return;
+    faceState = state;
+    moodFace(who, state).then((f) => {
+      if (faceState !== state) return;
+      if (!moodTex[state]) {
+        let c = f.canvas;
+        if (!head.isSprite) {
+          // the cube face needs an opaque picture: hair colour behind the cut-out
+          const bg = document.createElement('canvas');
+          bg.width = c.width;
+          bg.height = c.height;
+          const g = bg.getContext('2d');
+          g.fillStyle = hair;
+          g.fillRect(0, 0, bg.width, bg.height);
+          g.drawImage(c, 0, 0);
+          c = bg;
+        }
+        moodTex[state] = new THREE.CanvasTexture(c);
+        moodTex[state].colorSpace = THREE.SRGBColorSpace;
+      }
+      if (head.isSprite) {
+        head.material.map = moodTex[state];
+        head.material.needsUpdate = true;
+        head.scale.set(HH * f.aspect, HH, 1);
+      } else {
+        faceMat.map = moodTex[state];
+        faceMat.needsUpdate = true;
+      }
+    });
+  };
+  setFace('default');
 
   // drinking picture (bottle + hand in frame): replaces the head and the left arm while sipping
   let drink = null, sipLeft = 0;
@@ -159,9 +178,9 @@ function makeBoxPerson(opts) {
     const dh = 0.72; // a bit bigger than the normal head: bottle and hand are in frame
     drink.scale.set(dh * aspect, dh, 1);
     drink.center.set(0.71, 0); // his head sits right of centre in the photo, the bottle sticks out left
-    drink.position.y = 0.34;
+    drink.position.y = -0.22;
     drink.visible = false;
-    hips.add(drink);
+    rig.neck.add(drink);
   }
   const showDrink = (on) => {
     drink.visible = on;
@@ -170,50 +189,41 @@ function makeBoxPerson(opts) {
   };
 
   const tags = makeTags(root, name, label);
-  let pose = 'stand';
   return {
-    root, body, arms, ...tags,
-    // take a sip for `seconds` (no-op for guys without a drinking picture)
-    sip(seconds = 2.5) {
-      if (!drink) return;
-      sipLeft = seconds;
-      showDrink(true);
+    root, body, arms, rig, ...tags,
+    setFace,
+    setLoop: (name, o) => rig.setLoop(name, o),
+    play: (name, o) => rig.play(name, o),
+    get busy() {
+      return rig.busy;
+    },
+    // take a sip: the drinking photo if he has one, otherwise a 3D bottle to the mouth
+    sip(seconds = 2.4, kind = 'beer') {
+      if (drink) {
+        sipLeft = seconds;
+        showDrink(true);
+        rig.play('drinkPhoto', { dur: seconds });
+      } else rig.play('drink', { kind, dur: seconds });
     },
     setPose(p, y = 0) {
-      pose = p;
+      rig.setPose(p);
       body.rotation.set(0, 0, 0);
       body.position.set(0, 0, 0);
-      legs.rotation.x = 0;
-      arms.forEach((a) => (a.rotation.x = 0));
-      if (p === 'sit') {
-        body.position.y = -0.41 + y;
-        legs.rotation.x = -Math.PI / 2;
-      } else if (p === 'lie') {
+      if (p === 'sit') body.position.y = -0.37 + y;
+      else if (p === 'lie') {
         body.rotation.x = -Math.PI / 2;
         body.position.y = y + 0.12;
         body.position.z = 0.85;
       }
       tags.setY(p === 'lie' ? 1.1 + y : p === 'sit' ? 1.6 + y : 2.0);
     },
-    animate(t, walking, extra = 0, dt = 0) {
+    update(dt, state = {}) {
       tags.tick(dt);
       if (sipLeft > 0 && (sipLeft -= dt) <= 0) showDrink(false);
-      if (pose === 'stand' && walking) {
-        const s = Math.sin(t * 9);
-        legs.children[0].rotation.x = s * 0.5;
-        legs.children[1].rotation.x = -s * 0.5;
-        arms[0].rotation.x = -s * 0.4;
-        arms[1].rotation.x = s * 0.4;
-        body.position.y = Math.abs(Math.cos(t * 9)) * 0.03;
-      } else if (pose === 'stand') {
-        legs.children[0].rotation.x = legs.children[1].rotation.x = 0;
-        arms[0].rotation.x = arms[1].rotation.x = 0;
-        body.position.y = 0;
-      }
-      if (pose !== 'lie') hips.rotation.z = Math.sin(t * 1.7) * (0.02 + extra * 0.12);
+      rig.update(dt, state);
     },
     get pose() {
-      return pose;
+      return rig.pose;
     },
   };
 }
