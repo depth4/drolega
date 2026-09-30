@@ -2,7 +2,12 @@
 //   u — along the wall it stands against, v — from the wall (back) to the front, y — up.
 // Local -> plan coords via `facing`, then plan -> world via mx(), so mirroring just works.
 import * as THREE from 'three';
-import { FURNITURE, ROOMS, H, mx } from './layout.js';
+import { FURNITURE, ROOMS, PAINTINGS, H, mx } from './layout.js';
+import frogs from '../assets/art/frogs.webp?inline';
+import mushrooms from '../assets/art/mushrooms.webp?inline';
+import pharaohs from '../assets/art/pharaohs.webp?inline';
+
+const ART = { frogs, mushrooms, pharaohs };
 import { boxGeo, mat } from './apartment.js';
 import * as T from './textures.js';
 
@@ -273,6 +278,21 @@ function chandelier(group, [x, z]) {
   }
 }
 
+function painting(group, p) {
+  const h = p.w * (928 / 1664);
+  const n = p.facing === '+x' ? 1 : -1;
+  const frame = new THREE.Mesh(boxGeo(0, 0.03, -h / 2 - 0.05, h / 2 + 0.05, -p.w / 2 - 0.05, p.w / 2 + 0.05), M.darkWood);
+  frame.position.set(p.x + (n > 0 ? 0.005 : -0.035), p.y, p.z);
+  group.add(frame);
+  const tex = new THREE.TextureLoader().load(ART[p.img]);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  tex.anisotropy = 8;
+  const pic = new THREE.Mesh(new THREE.PlaneGeometry(p.w, h).rotateY(n > 0 ? Math.PI / 2 : -Math.PI / 2), new THREE.MeshStandardMaterial({ map: tex, roughness: 0.6 }));
+  pic.position.set(p.x + n * 0.037, p.y, p.z);
+  pic.userData.target = { name: 'Картина', info: () => 'С днюхой, Олег' };
+  group.add(pic);
+}
+
 export function buildFurniture() {
   const group = new THREE.Group();
   const items = {};
@@ -284,8 +304,9 @@ export function buildFurniture() {
     BUILD[item.id]?.(f);
     group.add(g);
     items[item.id] = { ...item, group: g };
-    if (!item.onTop) colliders.push({ x0: item.x0, x1: item.x1, z0: item.z0, z1: item.z1 });
+    if (!item.onTop) colliders.push({ x0: item.x0 + 0.05, x1: item.x1 - 0.05, z0: item.z0 + 0.05, z1: item.z1 - 0.05 });
   }
+  for (const p of PAINTINGS) painting(group, p);
   const living = ROOMS.find((r) => r.chandelier);
   if (living) chandelier(group, living.lamp);
 

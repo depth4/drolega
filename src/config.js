@@ -3,7 +3,9 @@
 export const TUNE = {
   nightSeconds: 180, // 22:00 -> 06:00
   nights: 5,
-  difficultyPerNight: 0.25, // problem chances grow by this each night
+  baseDifficulty: 0.7, // night 1 problem chance multiplier
+  difficultyPerNight: 0.2, // problem chances grow by this each night
+  warmup: { calm: 20, ramp: 50, min: 0.15 }, // first seconds are calm, then chaos ramps up over `ramp` seconds
 
   start: {
     totalFun: 70,
@@ -21,7 +23,7 @@ export const TUNE = {
   },
 
   fun: {
-    boredom: 0.6, // everyone loses this much fun per second
+    boredom: 0.45, // everyone loses this much fun per second
     music: 0.9, // bonus in the living room while music plays
     olegBoredom: 0.5,
     helpBonus: 8, // Oleg's fun for solving someone's problem
@@ -97,16 +99,16 @@ export const TUNE = {
   ],
 
   drinkEvery: { alexey: 4, lyokha: 5, temych: 7 },
-  drunkMult: { alexey: 0.7, lyokha: 2.2, temych: 1 },
+  drunkMult: { alexey: 0.7, lyokha: 1.6, temych: 1 },
 
-  grill: { decay: 5, lowAt: 25, shashlikEvery: 20, shashlikPlates: 2, smokeAfter: 4, draftChance: 0.02 },
-  vape: { coughAfter: 7 },
+  grill: { decay: 3.5, lowAt: 25, shashlikEvery: 20, shashlikPlates: 2, smokeAfter: 4, draftChance: 0.02 },
+  vape: { coughAfter: 10 },
   lyokha: { wastedAt: 75, sober: 30, pukeEvery: 10, smashEvery: 6 },
   alexey: { hogChance: 0.05, hogDrainEvery: 1.5, cryChance: 0.015 },
   kirill: { sleepChance: 0.04 },
 
   cat: {
-    boredom: 1.0,
+    boredom: 0.7,
     pet: 20, // quick but small
     toyPlay: 25, // seconds of play
     toyFun: 2.5, // per second while playing

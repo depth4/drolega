@@ -3,7 +3,7 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { buildApartment } from './world/apartment.js';
 import { buildFurniture } from './world/furniture.js';
-import { roomAt, START, DOORCAM } from './world/layout.js';
+import { roomAt, START, DOORCAM, SPOTS } from './world/layout.js';
 import { Game } from './game/game.js';
 import { Player } from './player.js';
 import { makeFX } from './fx.js';
@@ -26,7 +26,7 @@ const canvas = renderer.domElement;
 const scene = new THREE.Scene();
 scene.background = new THREE.Color('#0b0f1c');
 
-const camera = new THREE.PerspectiveCamera(72, innerWidth / innerHeight, 0.05, 200);
+const camera = new THREE.PerspectiveCamera(80, innerWidth / innerHeight, 0.05, 200);
 const orbitCam = new THREE.PerspectiveCamera(45, innerWidth / innerHeight, 0.1, 200);
 const doorCam = new THREE.PerspectiveCamera(80, 4 / 3, 0.05, 50);
 doorCam.position.set(...DOORCAM.pos);
@@ -42,6 +42,7 @@ const fx = makeFX(renderer, scene, camera);
 const hud = createHUD({ onBuy: (id) => game.buy(id) });
 window.__game = game; // handy in the console
 window.__player = player;
+window.__spots = SPOTS;
 
 const orbit = new OrbitControls(orbitCam, canvas);
 orbit.target.set(4.05, 0, 2.4);

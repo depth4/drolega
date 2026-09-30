@@ -3,7 +3,7 @@
 import * as THREE from 'three';
 import { mat } from './apartment.js';
 
-export function textSprite(text, { bg = 'rgba(20,18,24,0.78)', fg = '#fff', size = 40, scale = 0.0026 } = {}) {
+export function textSprite(text, { bg = 'rgba(20,18,24,0.78)', fg = '#fff', size = 40, scale = 0.001 } = {}) {
   const c = document.createElement('canvas');
   const g = c.getContext('2d');
   const font = `bold ${size}px "Russo One", "Arial", sans-serif`;
@@ -23,7 +23,8 @@ export function textSprite(text, { bg = 'rgba(20,18,24,0.78)', fg = '#fff', size
   g.fillText(text, c.width / 2, c.height / 2 + 2);
   const tex = new THREE.CanvasTexture(c);
   tex.colorSpace = THREE.SRGBColorSpace;
-  const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, depthTest: true, transparent: true }));
+  // constant on-screen size, so a friend standing next to you doesn't get a giant name tag
+  const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, depthTest: true, transparent: true, sizeAttenuation: false }));
   sprite.scale.set(c.width * scale, c.height * scale, 1);
   sprite.renderOrder = 10;
   return sprite;

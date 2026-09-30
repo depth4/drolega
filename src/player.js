@@ -1,6 +1,6 @@
 // First-person Oleg: WASD + mouse look, collisions against wall/furniture footprints, drunk sway.
 export const EYE = 1.62;
-const R = 0.22; // body radius
+const R = 0.17; // body radius (small, so doorways and the kitchen don't feel cramped)
 
 export class Player {
   constructor(camera, colliders) {

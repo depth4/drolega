@@ -85,8 +85,11 @@ export class Game {
     this.dynamic.add(this.toy);
   }
 
+  // problem frequency: grows each night, and every night starts calm and ramps up (TUNE.warmup)
   get diff() {
-    return 1 + (this.night - 1) * TUNE.difficultyPerNight;
+    const W = TUNE.warmup;
+    const ramp = Math.min(1, Math.max(0, (this.state.t - W.calm) / W.ramp));
+    return (TUNE.baseDifficulty + (this.night - 1) * TUNE.difficultyPerNight) * (W.min + (1 - W.min) * ramp);
   }
 
   // ---------- night lifecycle ----------
@@ -162,7 +165,7 @@ export class Game {
 
   toast(text, kind = 'info', room = null) {
     this.toasts.push({ text, kind, room, life: kind === 'alert' ? 5 : 3.5 });
-    if (this.toasts.length > 5) this.toasts.shift();
+    if (this.toasts.length > 3) this.toasts.shift();
   }
   alert(text, room, kind = 'alert') {
     this.toast(text, kind, room);

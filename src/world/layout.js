@@ -153,17 +153,17 @@ export const NAV_EDGES = [
 
 // Spots where friends hang out: position, nav node to reach it from, pose, where to look.
 const PLAN_SPOTS = {
-  sofaA: { p: [2.95, 1.8], node: 'livingW', pose: 'sit', look: [4, 1.8] },
-  sofaB: { p: [2.95, 2.6], node: 'livingW', pose: 'sit', look: [4, 2.6] },
+  sofaA: { p: [2.95, 1.8], node: 'livingW', pose: 'sit', y: 0.08, look: [4, 1.8] },
+  sofaB: { p: [2.95, 2.6], node: 'livingW', pose: 'sit', y: 0.08, look: [4, 2.6] },
   table1: { p: [4.72, 2.35], node: 'livingE', look: [4.0, 2.5] },
   table2: { p: [4.0, 3.5], node: 'living', look: [4.0, 2.6] },
   balcony: { p: [3.6, -0.85], node: 'balcony', look: [3.6, -2] },
   grill: { p: [4.6, -0.95], node: 'balcony', look: [5.2, -0.95] },
   kitchen: { p: [6.6, 1.05], node: 'kitchen', look: [6.6, 0.3] },
-  tub: { p: [7.2, 2.39], node: 'bath', pose: 'lie', look: [8.0, 2.39] },
+  tub: { p: [7.2, 2.39], node: 'bath', pose: 'lie', y: 0.2, look: [8.0, 2.39] },
   toilet: { p: [7.62, 3.68], node: 'bath', pose: 'sit', look: [6.5, 3.68] },
   bathStand: { p: [6.2, 3.1], node: 'bath', look: [7, 3.1] },
-  olegBed: { p: [0.5, 1.95], node: 'bedroom', pose: 'lie', look: [0.5, 3] },
+  olegBed: { p: [0.5, 1.95], node: 'bedroom', pose: 'lie', y: 0.47, look: [0.5, 3] }, // on top of the mattress
   bedroom: { p: [1.3, 3.6], node: 'bedroom', look: [1.3, 2] },
   hall: { p: [7.2, 4.6], node: 'hall', look: [6, 4.6] },
   hallWait: { p: [6.2, 4.6], node: 'hallW', look: [6.0, 3.8] },
@@ -185,6 +185,13 @@ const PLAN_CAT_SPOTS = {
 // Where the cat toy can be hidden (y = height, e.g. on a desk)
 const PLAN_TOY_SPOTS = [
   [0.95, 2.4], [4.0, 2.6], [6.4, 0.4], [7.25, 3.98], [5.75, 5.35], [1.0, 4.95], [2.55, -1.0], [2.0, 1.5, 0.76], [3.4, 5.2], [7.9, 0.15],
+];
+
+// Paintings (the birthday pictures). Hung on a wall: x = wall face, facing = which way the picture looks.
+const PLAN_PAINTINGS = [
+  { img: 'mushrooms', x: 2.42, z: 2.2, y: 1.45, w: 1.3, facing: '+x' }, // living room, above the sofa
+  { img: 'pharaohs', x: 2.3, z: 1.65, y: 1.5, w: 1.1, facing: '-x' }, // bedroom, above the sister's desk
+  { img: 'frogs', x: 5.6, z: 2.75, y: 1.95, w: 0.95, facing: '+x' }, // bathroom, above the tiles
 ];
 
 const PLAN_VISITOR = [9.05, 4.95]; // where visitors stand on the landing
@@ -222,6 +229,7 @@ export const CAT_SPOTS = Object.fromEntries(
   Object.entries(PLAN_CAT_SPOTS).map(([k, s]) => [k, { ...s, id: k, p: mpt(s.p), y: s.y ?? 0 }]),
 );
 export const TOY_SPOTS = PLAN_TOY_SPOTS.map(([x, z, y = 0]) => ({ p: [mx(x), z], y }));
+export const PAINTINGS = PLAN_PAINTINGS.map((p) => ({ ...p, x: mx(p.x), facing: mfacing(p.facing) }));
 export const VISITOR_SPOT = mpt(PLAN_VISITOR);
 export const DOORCAM = {
   pos: [mx(PLAN_DOORCAM.pos[0]), PLAN_DOORCAM.pos[1], PLAN_DOORCAM.pos[2]],
