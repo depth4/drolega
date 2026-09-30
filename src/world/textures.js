@@ -162,6 +162,12 @@ export const wallpapers = {
         }
     }),
   wallTile,
+  // stairwell: the classic green oil paint up to 1.5 m
+  landingPaint: () =>
+    wallpaper('wp-landing', '#4c7358', 'rgba(255,255,255,0.05)', (g, w) => {
+      const rnd = rng(5);
+      for (let i = 0; i < 300; i++) g.fillRect(rnd() * w, rnd() * w, 2, 2);
+    }),
 };
 
 // The legendary wall carpet (and a floor rug with another palette)

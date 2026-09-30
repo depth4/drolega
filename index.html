@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <title>5 ночей на хате у Олега</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Russo+One&family=PT+Sans:wght@400;700&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet" />
+  </head>
+  <body>
+    <div id="app"></div>
+
+    <div id="hud" hidden>
+      <div class="hud-tl">
+        <div class="clock"><span id="night">НОЧЬ 1</span><b id="time">22:00</b></div>
+        <div class="room" id="room">Прихожая</div>
+      </div>
+      <div class="hud-tr">
+        <div class="meter"><label>Общее веселье</label><div class="bar fun"><i id="bar-total"></i></div></div>
+        <div class="meter"><label>Состояние хаты</label><div class="bar hut"><i id="bar-hut"></i></div></div>
+        <div class="meter"><label>Соседи <span id="anger"></span></label><div class="bar noise"><i id="bar-noise"></i></div></div>
+      </div>
+      <div class="people" id="people"></div>
+      <div class="toasts" id="toasts"></div>
+      <div class="door-alert" id="door-alert" hidden>Стучат в дверь · F — камера</div>
+      <div class="crosshair"></div>
+      <div class="prompt" id="prompt"></div>
+      <div class="hotbar" id="hotbar"></div>
+      <div class="keys-hint">F — телефон · Q — выпить/съесть самому · G — выбросить · 1–4 — слот</div>
+      <div class="blackout" id="blackout" hidden>Олег вырубился…</div>
+    </div>
+
+    <div id="phone" hidden>
+      <div class="phone-top"><span id="phone-time">22:00</span><b id="phone-money">3000 ₽</b></div>
+      <div class="phone-tabs">
+        <button id="tab-cam" class="on" type="button">Камера</button>
+        <button id="tab-shop" type="button">Доставка</button>
+      </div>
+      <div class="phone-cam" id="phone-cam">
+        <div class="cam-view" id="cam-view"><canvas id="cam-canvas"></canvas><span class="rec">● REC · подъезд</span><span class="cam-who" id="cam-who">Никого</span></div>
+      </div>
+      <div class="phone-shop" id="phone-shop" hidden>
+        <ul id="shop-list"></ul>
+        <div class="orders" id="orders"></div>
+      </div>
+      <button class="phone-close" id="phone-close" type="button">Убрать телефон (F)</button>
+    </div>
+
+    <div id="menu">
+      <div class="menu-card">
+        <p class="eyebrow">Хрущёвка · 2 комнаты · 43 м²</p>
+        <h1>5 ночей<br /><span>на хате у Олега</span></h1>
+        <p class="lead">Ты — Олег. Пацаны пришли бухать. Держи общее веселье выше нуля, хату — целой, кота — живым. До 06:00.</p>
+        <div class="menu-buttons">
+          <button id="btn-play" class="primary" type="button">Начать ночь 1</button>
+          <button id="btn-orbit" type="button">Посмотреть хату сверху</button>
+        </div>
+        <p class="mobile-note" id="mobile-note" hidden>Играть — с компа (мышь + клавиатура). С телефона можно посмотреть хату сверху.</p>
+        <dl class="controls">
+          <div><dt>WASD</dt><dd>ходить, Shift — бегом</dd></div>
+          <div><dt>E / R / T</dt><dd>действия (подсказка у прицела)</dd></div>
+          <div><dt>1–4</dt><dd>слот инвентаря, Q — выпить самому</dd></div>
+          <div><dt>F</dt><dd>телефон: камера у двери и доставка</dd></div>
+        </dl>
+      </div>
+    </div>
+
+    <div id="end" hidden>
+      <div class="menu-card">
+        <p class="eyebrow" id="end-night">Ночь 1</p>
+        <h1 id="end-title">06:00</h1>
+        <p class="lead" id="end-reason"></p>
+        <p class="stats" id="end-stats"></p>
+        <div class="menu-buttons">
+          <button id="btn-next" class="primary" type="button">Дальше</button>
+          <button id="btn-menu" type="button">В меню</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="orbit-bar" hidden>
+      <button id="btn-back" type="button">← Меню</button>
+      <span>Вид сверху: крути мышью или пальцем</span>
+    </div>
+
+    <script type="module" src="/src/main.js"></script>
+  </body>
+</html>
