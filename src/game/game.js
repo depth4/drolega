@@ -560,7 +560,9 @@ export class Game {
     for (const d of Object.values(this.doors)) d.update(dt);
     if (this.entranceCloseT > 0) {
       this.entranceCloseT -= dt;
-      if (this.entranceCloseT <= 0) this.doors.entrance.setOpen(false);
+      const [cx, cz] = this.doors.entrance.center;
+      if (Math.hypot(this.olegPos[0] - cx, this.olegPos[1] - cz) < 0.9) this.entranceCloseT = 0.5; // don't slam it on Oleg
+      else if (this.entranceCloseT <= 0) this.doors.entrance.setOpen(false);
     }
 
     // stove

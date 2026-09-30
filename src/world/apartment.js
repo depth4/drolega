@@ -126,6 +126,26 @@ export function buildApartment() {
       group.add(new THREE.Mesh(boxGeo(s.x0 - 0.01, s.x1 + 0.01, b.railH - 0.05, b.railH, s.z0 - 0.01, s.z1 + 0.01), rail));
       colliders.push(s);
     }
+    // glazed balcony: white frames + glass from the railing up to a roof slab
+    const top = H - 0.05;
+    const frame = mat('#eeeae2', { roughness: 0.5 });
+    const glass = new THREE.MeshStandardMaterial({ color: '#a9c3d6', transparent: true, opacity: 0.16, roughness: 0.05, metalness: 0.1, side: THREE.DoubleSide });
+    const f = 0.05;
+    for (const s of sides) {
+      const alongX = s.x1 - s.x0 > s.z1 - s.z0;
+      const [a0, a1] = alongX ? [s.x0, s.x1] : [s.z0, s.z1];
+      const [c0, c1] = alongX ? [s.z0, s.z1] : [s.x0, s.x1];
+      const P = (u0, u1, y0, y1, w0, w1, m) => group.add(new THREE.Mesh(alongX ? boxGeo(u0, u1, y0, y1, w0, w1) : boxGeo(w0, w1, y0, y1, u0, u1), m));
+      const n = Math.max(1, Math.round((a1 - a0) / 0.8));
+      for (let i = 0; i <= n; i++) {
+        const u = a0 + ((a1 - a0) * i) / n;
+        P(Math.max(a0, u - f / 2), Math.min(a1, u + f / 2), b.railH, top, c0, c1, frame);
+      }
+      P(a0, a1, b.railH, b.railH + f, c0, c1, frame);
+      P(a0, a1, top - f, top, c0, c1, frame);
+      P(a0, a1, b.railH + f, top - f, (c0 + c1) / 2 - 0.005, (c0 + c1) / 2 + 0.005, glass);
+    }
+    ceiling.add(new THREE.Mesh(boxGeo(b.x0 - 0.05, b.x1 + 0.05, top, top + 0.12, b.z0 - 0.05, b.z1), mat('#8a857c')));
   }
 
   // --- ceiling (faces down, so it is invisible from above anyway)
@@ -304,7 +324,7 @@ function addOpeningDetails(group, w, o, ax, t0, t1, m, doors, colliders) {
     box((a + b) / 2 - f / 2, (a + b) / 2 + f / 2, o.bottom, o.top, fu0, fu1, m.frame);
     box(a, b, o.top - 0.55, o.top - 0.55 + f / 2, fu0, fu1, m.frame); // fortochka line
     box(a + f, b - f, o.bottom + f, o.top - f, mid - 0.01, mid + 0.01, m.glass);
-    box(a - 0.05, b + 0.05, o.bottom - 0.04, o.bottom, mid, innerFace + 0.07 * inside, m.sill);
+    box(a - 0.05, b + 0.05, o.bottom - 0.01, o.bottom + 0.03, mid, innerFace + 0.07 * inside, m.sill); // above the wall top, no z-fighting
     box(a + 0.2, b - 0.2, 0.15, 0.7, innerFace + 0.03 * inside, innerFace + 0.12 * inside, m.radiator);
   }
   if (o.kind === 'balcony') {

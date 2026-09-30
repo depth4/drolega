@@ -28,17 +28,19 @@ export class Player {
     this.pitch = Math.max(-1.45, Math.min(1.45, this.pitch - dy * 0.0022));
   }
 
-  blocked(x, z) {
-    for (const c of this.colliders) {
-      if (c.enabled === false) continue;
-      if (c.seg) {
-        const [ax, az, bx, bz] = c.seg;
-        const vx = bx - ax, vz = bz - az;
-        const t = Math.max(0, Math.min(1, ((x - ax) * vx + (z - az) * vz) / (vx * vx + vz * vz)));
-        if (Math.hypot(x - ax - vx * t, z - az - vz * t) < c.r + R) return true;
-      } else if (x > c.x0 - R && x < c.x1 + R && z > c.z0 - R && z < c.z1 + R) return true;
+  static hits(c, x, z) {
+    if (c.seg) {
+      const [ax, az, bx, bz] = c.seg;
+      const vx = bx - ax, vz = bz - az;
+      const t = Math.max(0, Math.min(1, ((x - ax) * vx + (z - az) * vz) / (vx * vx + vz * vz)));
+      return Math.hypot(x - ax - vx * t, z - az - vz * t) < c.r + R;
     }
-    return false;
+    return x > c.x0 - R && x < c.x1 + R && z > c.z0 - R && z < c.z1 + R;
+  }
+
+  // a collider we are already inside (a door closed on us) never traps us: we can always walk out
+  blocked(x, z) {
+    return this.colliders.some((c) => c.enabled !== false && Player.hits(c, x, z) && !Player.hits(c, this.x, this.z));
   }
 
   update(dt, { drunk = 0, canMove = true } = {}) {

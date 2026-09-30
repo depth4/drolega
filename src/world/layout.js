@@ -73,7 +73,7 @@ const PLAN_WALLS = [
     id: 'living|east', ...r(5.48, 5.6, 0, 5.5),
     openings: [
       { at: [0.45, 1.28], ...DOOR }, // living room is connected to the kitchen (no door)
-      { at: [4.25, 5.5], ...DOOR }, // passage to the hall (dashed on the plan)
+      { at: [3.5, 5.5], ...DOOR }, // open passage to the hall, all the way to the diagonal bath wall
     ],
   },
   { id: 'kitchen|bath', ...r(5.6, 8.1, 1.9, 2.02) }, // old kitchen door is walled up
@@ -155,7 +155,7 @@ export const NAV_EDGES = [
 const PLAN_SPOTS = {
   sofaA: { p: [2.95, 1.8], node: 'livingW', pose: 'sit', y: 0.08, look: [4, 1.8] },
   sofaB: { p: [2.95, 2.6], node: 'livingW', pose: 'sit', y: 0.08, look: [4, 2.6] },
-  table1: { p: [4.72, 2.35], node: 'livingE', look: [4.0, 2.5] },
+  table1: { p: [4.6, 2.35], node: 'livingE', look: [4.0, 2.5] }, // keep arms out of the TV
   table2: { p: [4.0, 3.5], node: 'living', look: [4.0, 2.6] },
   balcony: { p: [3.6, -0.85], node: 'balcony', look: [3.6, -2] },
   grill: { p: [4.6, -0.95], node: 'balcony', look: [5.2, -0.95] },

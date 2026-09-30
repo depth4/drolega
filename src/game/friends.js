@@ -638,7 +638,7 @@ export class Cat extends Walker {
     if (room === 'balcony') {
       this.balconyT += dt;
       if (this.balconyT >= C.climbAfter && this.mode !== 'walk' && this.spot?.id !== 'catRail' && this.problem?.id !== 'rail') {
-        this.walkTo(CAT_SPOTS.catRail, () => this.setProblem('rail', 'залез на перила балкона!', 'НА ПЕРИЛАХ', 0));
+        this.walkTo(CAT_SPOTS.catRail, () => this.setProblem('rail', 'лезет в открытую створку на балконе!', 'В ОКНЕ', 0));
       }
       if (this.problem?.id === 'rail') {
         this.railT += dt;
@@ -673,7 +673,7 @@ export class Cat extends Walker {
     const onBalcony = this.room?.id === 'balcony';
     if (onBalcony) {
       return [{
-        key: 'E', text: this.problem?.id === 'rail' ? 'Снять с перил!' : 'Забрать кота с балкона',
+        key: 'E', text: this.problem?.id === 'rail' ? 'Снять с окна!' : 'Забрать кота с балкона',
         run: () => {
           this.clearProblem(this.problem?.id === 'rail');
           this.railT = 0;
