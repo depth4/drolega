@@ -440,7 +440,8 @@ export function createRig(body, { m, sk, style }) {
   const neck = new THREE.Group();
   neck.position.y = DIM.neckY;
   spine.add(neck);
-  neck.add(new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.07, 0.1).translate(0, 0.03, 0), m.skin));
+  const neckMesh = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.07, 0.1).translate(0, 0.03, 0), m.skin);
+  neck.add(neckMesh);
   const shoe = mat('#1a1a1a', { roughness: 0.6 });
 
   const legs = SIDES.map((s, i) => {
@@ -559,7 +560,7 @@ export function createRig(body, { m, sk, style }) {
   };
 
   return {
-    pelvis, spine, neck, arms, legs,
+    pelvis, spine, neck, neckMesh, arms, legs,
     get pose() { return pose; },
     setPose(p) {
       pose = p;

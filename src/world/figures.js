@@ -147,6 +147,7 @@ function makeBoxPerson(opts) {
         head.material.needsUpdate = true;
         head.scale.set(HH * legacy.aspect, HH, 1);
         head.position.y = -0.01;
+        rig.neckMesh.visible = true;
       } else {
         faceMat.map = legacy.map;
         faceMat.needsUpdate = true;
@@ -175,7 +176,8 @@ function makeBoxPerson(opts) {
         head.material.map = moodTex[state];
         head.material.needsUpdate = true;
         head.scale.set(HH * f.aspect, HH, 1);
-        head.position.y = -0.07; // mood heads include the neck: overlap ours
+        head.position.y = -0.1; // mood heads come with their own neck: sit it in the collar
+        rig.neckMesh.visible = false;
       } else {
         faceMat.map = moodTex[state];
         faceMat.needsUpdate = true;
