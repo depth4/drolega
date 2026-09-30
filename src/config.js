@@ -98,8 +98,8 @@ export const TUNE = {
     { id: 'pills', title: 'Таблетки от ЗПП', note: 'скоро', price: 600, gives: { pills: 1 }, soon: true },
   ],
 
-  drinkEvery: { alexey: 4, lyokha: 5, temych: 7 },
-  drunkMult: { alexey: 0.7, lyokha: 1.6, temych: 1 },
+  drinkEvery: { alexey: 4, lyokha: 5, temych: 7, kirill: 7 },
+  drunkMult: { alexey: 0.7, lyokha: 1.6, temych: 1, kirill: 0.8 },
 
   grill: { decay: 3.5, lowAt: 25, shashlikEvery: 20, shashlikPlates: 2, smokeAfter: 4, draftChance: 0.02 },
   vape: { coughAfter: 10 },

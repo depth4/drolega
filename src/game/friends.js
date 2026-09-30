@@ -127,8 +127,9 @@ export const CHARS = {
     wantsDrink: (f) => !f.wasted,
   },
   kirill: {
-    name: 'Кирилл', shirt: '#2f5c9e', hair: '#1c1c1c',
-    start: 'sofaA', prefs: { grill: 6, anime: 3, sofa: 1, table: 1 }, drinker: false,
+    name: 'Кирилл', shirt: '#2f5c9e', hair: '#1c1c1c', drinkFaceId: 'kirillDrink',
+    start: 'sofaA', prefs: { grill: 6, anime: 3, table: 2, sofa: 1 }, drinker: true,
+    needsBooze: false, // drinks when there is booze, but an empty table doesn't upset him
   },
   temych: {
     name: 'Темыч', shirt: '#6b3fa0', hair: '#a07040',
@@ -367,6 +368,7 @@ export class Friend extends Walker {
   }
 
   drink(d, buzzTime = 0) {
+    this.figure.sip(2.2);
     this.fun += d.fun;
     this.drunk = clamp(this.drunk + d.drunk * (TUNE.drunkMult[this.id] ?? 1));
     if (buzzTime) this.buzz = Math.max(this.buzz ?? 0, buzzTime);
@@ -495,7 +497,7 @@ export class Friend extends Walker {
           tb[kind] -= 1;
           this.drink(D[kind], D[kind].buzzTime);
           this.bladder += 12;
-        } else {
+        } else if (this.def.needsBooze !== false) {
           this.fun -= D.noBooze * every;
           g.toastOnce('nobooze', 'Бухло на столе кончилось!', 'warn', 12);
         }

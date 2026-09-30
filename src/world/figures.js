@@ -128,11 +128,12 @@ function makeBoxPerson(opts) {
     hips.add(arm);
     arms.push(arm);
   }
+  let head;
   if (opts.style === 'sprite') {
     // Doom-style head: a flat cut-out face that always turns to the camera
     const aspect = faceAspect(opts.faceId);
     const tex = faceTexture({ ...opts, skin, hair }, { w: 256, h: Math.round(256 / aspect), cutout: true });
-    const head = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, transparent: true, alphaTest: 0.1 }));
+    head = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, transparent: true, alphaTest: 0.1 }));
     const hh = 0.5;
     head.scale.set(hh * aspect, hh, 1);
     head.center.set(0.5, 0);
@@ -143,15 +144,40 @@ function makeBoxPerson(opts) {
     const face = new THREE.MeshStandardMaterial({ map: faceTexture({ ...opts, skin, hair }), roughness: 0.8 });
     const h = sk?.head;
     const mats = h ? [h.sides[0], h.sides[1], h.top, m.skin, h.front, h.back] : [m.skin, m.skin, m.hair, m.skin, face, m.hair];
-    const head = new THREE.Mesh(new THREE.BoxGeometry(0.32, 0.36, 0.3).translate(0, 0.2, 0), mats);
+    head = new THREE.Mesh(new THREE.BoxGeometry(0.32, 0.36, 0.3).translate(0, 0.2, 0), mats);
     head.position.y = 0.64;
     hips.add(head);
   }
+
+  // drinking picture (bottle + hand in frame): replaces the head and the left arm while sipping
+  let drink = null, sipLeft = 0;
+  if (opts.drinkFaceId) {
+    const aspect = faceAspect(opts.drinkFaceId);
+    const tex = faceTexture({ ...opts, faceId: opts.drinkFaceId, skin, hair }, { w: 384, h: Math.round(384 / aspect), cutout: true });
+    drink = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, transparent: true, alphaTest: 0.1 }));
+    const dh = 0.72; // a bit bigger than the normal head
+    drink.scale.set(dh * aspect, dh, 1);
+    drink.center.set(0.71, 0); // his head sits right of centre in the photo, the bottle sticks out left
+    drink.position.y = 0.4;
+    drink.visible = false;
+    hips.add(drink);
+  }
+  const showDrink = (on) => {
+    drink.visible = on;
+    head.visible = !on;
+    arms[1].visible = !on; // arms[1] is the figure's left arm
+  };
 
   const tags = makeTags(root, name, label);
   let pose = 'stand';
   return {
     root, body, arms, ...tags,
+    // take a sip for `seconds` (no-op for guys without a drinking picture)
+    sip(seconds = 2.5) {
+      if (!drink) return;
+      sipLeft = seconds;
+      showDrink(true);
+    },
     setPose(p, y = 0) {
       pose = p;
       body.rotation.set(0, 0, 0);
@@ -170,6 +196,7 @@ function makeBoxPerson(opts) {
     },
     animate(t, walking, extra = 0, dt = 0) {
       tags.tick(dt);
+      if (sipLeft > 0 && (sipLeft -= dt) <= 0) showDrink(false);
       if (pose === 'stand' && walking) {
         const s = Math.sin(t * 9);
         legs.children[0].rotation.x = s * 0.5;

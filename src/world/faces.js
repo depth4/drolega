@@ -1,10 +1,13 @@
 // Faces of the guys. A photo (cropped to the face, normalized x, y, w, h) or a drawn placeholder.
 // To add someone's face: drop a photo into src/assets/faces/ and add it here.
 import kirill from '../assets/faces/kirill.png?inline';
+import kirillDrink from '../assets/faces/kirill-drink.png?inline';
 import lyokhaSheet from '../assets/skins/lyokha.png?inline';
 
 const PHOTOS = {
   kirill: { src: kirill, crop: [0.16, 0.0, 0.74, 0.8], w: 449, h: 600 },
+  // shown instead of the head while he drinks (bottle and hand included)
+  kirillDrink: { src: kirillDrink, crop: [0, 70 / 600, 420 / 450, 370 / 600], w: 450, h: 600 },
   // cartoon head from his skin sheet until there's a photo; white sheet background keyed out
   lyokha: { src: lyokhaSheet, crop: [73 / 600, 40 / 334, 46 / 600, 52 / 334], w: 600, h: 334, keyWhite: true },
 };
