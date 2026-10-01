@@ -2,7 +2,7 @@
 // puddles, broken things, the stove, the grill, the cat toy and Oleg himself.
 import * as THREE from 'three';
 import { TUNE } from '../config.js';
-import { FURNITURE, TOY_SPOTS, VISITOR_SPOT, CAT_SPOTS, roomAt } from '../world/layout.js';
+import { FURNITURE, TOY_SPOTS, VISITOR_SPOT, CAT_SPOTS, SPOTS, roomAt } from '../world/layout.js';
 import { makePerson, makePuddle, makeToy, makeBottle, makePlate, makeBrokenMark, makeBucket } from '../world/figures.js';
 import { Friend, Cat, clamp, rand } from './friends.js';
 import { particles } from '../world/particles.js';
@@ -11,6 +11,7 @@ import { Interactions } from './interact.js';
 import { Cooking } from './cooking.js';
 import { PartyEvents } from './events.js';
 import { PC } from './pc.js';
+import { Living } from './living.js';
 
 export const ITEMS = {
   beer: { name: 'Пиво', icon: '🍺' },
@@ -119,6 +120,64 @@ export class Game {
     this.buildBucket();
     this.events = new PartyEvents(this);
     this.pc = new PC(this);
+    this.living = new Living(this);
+  }
+
+  // ---------- partying (Oleg is at the party too) ----------
+
+  // friends close to Oleg in the same room
+  company() {
+    const [x, z] = this.olegPos, room = roomAt(x, z)?.id, V = TUNE.vibe;
+    return this.friends.filter((f) => !f.fallen && f.room?.id === room && Math.hypot(f.pos[0] - x, f.pos[1] - z) < V.near);
+  }
+
+  vibeTick(dt) {
+    const V = TUNE.vibe, o = this.oleg, st = this.state;
+    const c = this.company();
+    this.vibe = c.length;
+    o.dance = Math.max(0, (o.dance ?? 0) - dt);
+    if (c.length) {
+      this.aloneT = 0;
+      o.fun = clamp(o.fun + V.withFriends * Math.min(3, c.length) * dt);
+      for (const f of c) f.fun = clamp(f.fun + V.hostBonus * dt);
+    } else {
+      this.aloneT = (this.aloneT ?? 0) + dt;
+      if (this.aloneT > V.missAfter) {
+        for (const f of this.friends) if (!f.problem) f.fun = clamp(f.fun - V.missDrain * dt);
+        if (this.toastOnce('miss', 'Пацаны: «Олег, ты где? Иди к нам!»', 'warn', 30)) {
+          const f = this.friends.find((x) => !x.problem);
+          f?.figure.say('Олег, ты где там?!', 2.5);
+        }
+      }
+    }
+  }
+
+  // Oleg drank: next to the guys it's a cheers
+  cheers() {
+    const V = TUNE.vibe, c = this.company();
+    if (c.length < 1 || this.state.t < (this.cheersCd ?? 0)) return;
+    this.cheersCd = this.state.t + V.cheersCd;
+    this.oleg.fun = clamp(this.oleg.fun + V.cheers);
+    c.forEach((f, i) => {
+      f.fun = clamp(f.fun + V.cheers);
+      f.figure.play('laugh');
+      if (i === 0) f.figure.say(['Будем!', 'Давай, за нас!', 'Чин-чин!', 'Олег красава'][Math.floor(Math.random() * 4)], 2);
+    });
+    this.sfx.ding();
+  }
+
+  // T with nothing to do: dance (only with music on)
+  olegDance() {
+    const V = TUNE.vibe, o = this.oleg;
+    if (!this.state.music) return this.toastOnce('danceNoMusic', 'Без музыки не танцуется — врубай музон', 'info', 4);
+    if (o.dance > 0 || !this.spend(V.danceCost)) return;
+    o.dance = V.dance;
+    o.fun = clamp(o.fun + V.danceFun);
+    for (const f of this.company()) {
+      f.fun = clamp(f.fun + V.danceFun);
+      f.figure.play('laugh');
+    }
+    this.company()[0]?.figure.say('Олег отжигает!', 2);
   }
 
   // ---------- drunk physics ----------
@@ -364,6 +423,7 @@ export class Game {
       fridge: { ...NS.fridge },
       table: { ...NS.table },
       music: false,
+      volume: 1,
       noise: 0,
       anger: 0,
       neighborCd: 10,
@@ -390,6 +450,7 @@ export class Game {
     particles.clear();
     this.events?.reset();
     this.pc?.reset();
+    this.living?.reset();
     this.placeBucket(...this.bucketHome);
     for (const p of this.puddles ?? []) this.dynamic.remove(p);
     this.puddles = [];
@@ -444,6 +505,7 @@ export class Game {
     if (this.toastKeys[key] !== undefined && now - this.toastKeys[key] < cooldown) return;
     this.toastKeys[key] = now;
     this.toast(text, kind);
+    return true;
   }
   olegHelped() {
     this.oleg.fun += TUNE.fun.helpBonus;
@@ -690,6 +752,7 @@ export class Game {
     if (item === 'beer' || item === 'vodka') {
       this.oleg.thirst = Math.max(0, this.oleg.thirst - TUNE.olegThirst[item]);
       this.events.olegDrank();
+      this.cheers();
     }
     this.oleg.drunk = clamp(this.oleg.drunk + d.drunk);
     this.sfx.gulp();
@@ -774,12 +837,29 @@ export class Game {
       this.kochT = rand(...K.every) / this.diff;
       const starters = this.kochCandidates().filter((c) => c !== 'oleg');
       if (!starters.length) return;
+      const who = pick(starters);
       this.koch = { step: 0 };
-      this.kochShout(pick(starters));
+      // sometimes he goes out on the balcony and yells it out of the window, for the whole yard to hear
+      if (Math.random() < K.balconyChance && !who.event && who.mode !== 'walk') {
+        this.koch.waiting = true;
+        who.endActivity(true);
+        const ok = who.walkTo(SPOTS.balcony, () => {
+          if (!this.koch?.waiting) return;
+          this.koch.waiting = false;
+          this.living.setWindow(true, who);
+          who.figure.say('КООООЧ НА ВЕСЬ ДВОР!', 2.5);
+          this.state.noise += K.balconyNoise;
+          this.kochShout(who);
+        });
+        if (ok) return;
+        this.koch.waiting = false;
+      }
+      this.kochShout(who);
       return;
     }
     // the next one answers when the current shout is mostly over
     const k = this.koch;
+    if (k.waiting) return;
     const dur = Number.isFinite(k.h?.audio.duration) ? k.h.audio.duration : 2;
     if (st.t - k.start < Math.min(dur, 3) * 0.7 + k.gap && k.h?.playing !== false) return;
     const pool = this.kochCandidates().filter((c) => c !== k.last);
@@ -965,13 +1045,15 @@ export class Game {
       },
     });
     T('stenka', {
+      info: () => (this.state.music ? `Музыка: громкость ${this.state.volume}/3` : 'Музыка выключена'),
       actions: () => [{
         key: 'E', text: this.state.music ? 'Выключить музыку' : 'Врубить музыку',
         run: () => {
           if (it.stenka.broken) return this.toast('Музыка сломана — почини', 'warn');
           this.state.music = !this.state.music;
+          this.state.volume = 1;
         },
-      }],
+      }, ...(this.state.music && this.state.volume > 1 ? [{ key: 'R', text: 'Сделать тише', run: () => (this.state.volume -= 1) }] : [])],
     });
     T('tub', {
       tub: true,
@@ -1171,9 +1253,11 @@ export class Game {
     for (const f of this.friends) f.update(dt);
     this.bumps();
     this.olegPhysics(dt);
+    this.vibeTick(dt);
     particles.update(dt);
     this.updateToy(dt);
     this.events.update(dt);
+    this.living.update(dt);
     this.cat.update(dt);
     for (const d of Object.values(this.doors)) d.update(dt);
     if (this.entranceCloseT > 0) {
@@ -1211,6 +1295,7 @@ export class Game {
     const has = (id) => this.friends.some((f) => f.problem?.id === id);
     let noise = 0;
     if (st.music && !this.hushed) noise += src.music;
+    if (!this.hushed) noise += this.living.noise();
     if (has('cry')) noise += src.cry;
     if (has('puke')) noise += src.puke;
     if (has('smash')) noise += src.smash;

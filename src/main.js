@@ -265,7 +265,10 @@ document.addEventListener('mousedown', (e) => {
 });
 document.addEventListener('mouseup', (e) => e.button === 0 && (use.down = false));
 canvas.addEventListener('mousedown', () => {
-  if (mode === 'play' && !locked && !phoneOpen && !focusActive()) dragging = true;
+  if (mode !== 'play' || locked || phoneOpen || focusActive()) return;
+  // back from a close-up (pot, PC) the browser may refuse to re-lock the mouse on its own: a click does it
+  dragging = true;
+  lock();
 });
 addEventListener('mouseup', () => (dragging = false));
 addEventListener('wheel', (e) => mode === 'play' && game.inv.select(game.inv.sel + Math.sign(e.deltaY)));
@@ -300,7 +303,7 @@ addEventListener('keydown', (e) => {
     act.run();
     hands.play('use');
     audio.sfx.click();
-  }
+  } else if (k === 'KeyT') game.olegDance(); // nothing to do with T here: dance
 });
 addEventListener('keyup', (e) => player.keys.delete(e.code));
 addEventListener('blur', () => player.keys.clear());
@@ -379,11 +382,13 @@ function frame(now) {
     } else {
       if (wasFocused) {
         wasFocused = false;
+        use.down = false;
         lock();
+        setTimeout(() => !locked && mode === 'play' && !focusActive() && game.toastOnce('relock', 'Кликни мышью, чтобы снова крутить головой', 'info', 4), 400);
       }
       // the phone is in his hand: he can keep walking with it (WASD), the mouse is on the screen
       const px = player.x, pz = player.z;
-      player.update(dt, { drunk: game.oleg.drunk, canMove: !(game.oleg.blackout > 0) && !listening, fall: game.olegFallK });
+      player.update(dt, { drunk: game.oleg.drunk, canMove: !(game.oleg.blackout > 0) && !listening, fall: game.olegFallK, dance: game.oleg.dance > 0 ? game.oleg.dance : 0 });
       game.olegSpeed = Math.hypot(player.x - px, player.z - pz) / Math.max(dt, 1e-4);
     }
     focusRay.setFromCamera(focusActive() ? mouseNdc : center, camera);

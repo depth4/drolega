@@ -232,3 +232,6 @@ body.focus #hotbar, body.focus .keys-hint, body.focus #hand-name, body.focus .hu
 .courier-chip { margin-top: 6px; padding: 5px 10px; border-radius: 8px; background: var(--panel); border: 1px solid var(--line); font: 600 13px var(--body, 'PT Sans', sans-serif); color: var(--ink); max-width: 250px; line-height: 1.3; }
 .courier-chip.here { background: #f2b33d; color: #1b1408; border-color: #f2b33d; animation: chip-blink 0.8s steps(2) infinite; }
 @keyframes chip-blink { 50% { filter: brightness(1.25); } }
+
+.oleg h3 em.vibe { color: var(--ink-dim); }
+.oleg h3 em.vibe.on { color: var(--good); }

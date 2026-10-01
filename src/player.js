@@ -44,7 +44,7 @@ export class Player {
   }
 
   // fall: 0 standing .. 1 lying on the floor (Oleg tripped / slipped)
-  update(dt, { drunk = 0, canMove = true, fall = 0 } = {}) {
+  update(dt, { drunk = 0, canMove = true, fall = 0, dance = 0 } = {}) {
     this.t += dt;
     const k = this.keys;
     if (fall > 0) canMove = false;
@@ -68,7 +68,9 @@ export class Player {
       if (!this.blocked(this.x, this.z + dz * step)) this.z += dz * step;
       this.walkT += dt * (speed / 3.1);
     }
-    const bob = moving ? Math.sin(this.walkT * 8) * 0.03 : 0;
+    // dancing: bouncing to the beat, head going side to side
+    const bob = (moving ? Math.sin(this.walkT * 8) * 0.03 : 0) + (dance > 0 ? Math.abs(Math.sin(this.t * 5.2)) * 0.09 : 0);
+    const groove = dance > 0 ? Math.sin(this.t * 2.6) * 0.12 : 0;
     const sway = d * d;
     this.camera.position.set(
       this.x + Math.sin(this.t * 0.9) * sway * 0.08,
@@ -78,7 +80,7 @@ export class Player {
     this.camera.rotation.set(
       this.pitch * (1 - fall) + fall * 0.35 + Math.sin(this.t * 1.1) * sway * 0.08,
       this.yaw + Math.sin(this.t * 0.6) * sway * 0.12,
-      Math.sin(this.t * 0.8) * sway * 0.15 + fall * 1.25, // lying on his side
+      Math.sin(this.t * 0.8) * sway * 0.15 + fall * 1.25 + groove, // lying on his side / dancing
     );
   }
 }

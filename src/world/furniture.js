@@ -170,7 +170,7 @@ const BUILD = {
     for (let k = 0; k < 4; k++) f.box(0.05 + k * (U / 4), (k + 1) * (U / 4) - 0.05, 0.05, 0.7, D, D + 0.01, M.wood);
     // TV in the niche
     f.box(col + 0.05, U - col - 0.05, 0.78, 1.28, 0.05, D - 0.02, mat('#2b2b2b', { roughness: 0.5 }));
-    f.box(col + 0.1, U - col - 0.1, 0.83, 1.23, D - 0.02, D - 0.01, M.screen);
+    f.box(col + 0.1, U - col - 0.1, 0.83, 1.23, D - 0.02, D - 0.01, M.screen).userData.tvScreen = true; // drawn by src/game/living.js
   },
   ficus(f) {
     const { U, D } = f;

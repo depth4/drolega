@@ -34,7 +34,7 @@ export const TUNE = {
   fun: {
     boredom: 0.5, // everyone loses this much fun per second (x night pace)
     music: 0.7, // bonus in the living room while music plays
-    olegBoredom: 0.5,
+    olegBoredom: 0.8, // Oleg gets bored fast on his own: he has to party, not just clean up
     helpBonus: 8, // Oleg's fun for solving someone's problem
   },
 
@@ -86,11 +86,20 @@ export const TUNE = {
   // fun for the guy spinning (per second) and for the ones watching a win / a loss; КС duel
   pc: { edge: 0.9, sell: 0.85, playFun: 0.8, winFun: 10, loseFun: 3, csKills: 6, csWin: 15, csWatch: 10, watchFun: 0.7 },
 
+  // partying with the guys: Oleg near friends (within near m, same room) gets withFriends fun per friend
+  // per second and each of them hostBonus; away from everyone longer than missAfter s and they miss him
+  // (missDrain each); a drink next to them = cheers (cheers fun for all); T = dance (dance s, needs music)
+  vibe: { near: 3.5, withFriends: 0.3, hostBonus: 0.35, missAfter: 25, missDrain: 0.4, cheers: 6, cheersCd: 12, dance: 5, danceFun: 8, danceCost: 8 },
+
   // drunk physics: bodies push each other apart; running into a drunk guy knocks him over (knockOver:
   // speed/5 x (0.35 + drunk) above it); two drunks (drunk sum > bumpDrunk) bumping may fall (bumpFall);
   // puddles are slippery (slip + drunk/200); a fall makes the others laugh (laugh fun each);
   // Oleg drunk above olegTripAt trips while running (olegTrip per second at 100%), slips on puddles (olegSlip)
   chaos: { radius: 0.24, bumpDrunk: 90, bumpFall: 0.35, knockOver: 0.5, slip: 0.45, laugh: 3, olegTripAt: 45, olegTrip: 0.3, olegSlip: 0.35 },
+
+  // the flat lives on its own (living.js): TV fun per volume step for the guys in the living room, its noise;
+  // extra noise per music volume step above 1; how often the guys mess with the TV / music / window
+  living: { tvFun: 0.08, tvNoise: 0.8, musicLoud: 1.5, musicFun: 0.35, prankEvery: [22, 40] },
 
   // party events (which ones run on a night: NIGHTS[n].events)
   events: {
@@ -102,7 +111,8 @@ export const TUNE = {
   },
 
   // "Коч!" chain: someone yells, others pick it up with a fading chance
-  koch: { firstAfter: 25, every: [35, 60], chance: 0.85, decay: 0.8, max: 6, fun: 5, olegFun: 2, noise: 6 },
+  // balconyChance: the first one goes to yell it out of the balcony window (opens it, balconyNoise extra)
+  koch: { balconyChance: 0.35, balconyNoise: 10, firstAfter: 25, every: [35, 60], chance: 0.85, decay: 0.8, max: 6, fun: 5, olegFun: 2, noise: 6 },
 
   // "Потрещать": he tells a recorded story; Oleg is stuck listening for `lock` of it (0.5 = first half)
   talk: { fun: 18, olegFun: 6, cooldown: 30, lock: 0.5 },
@@ -158,7 +168,7 @@ export const TUNE = {
 
   grill: { decay: 3.5, lowAt: 25, shashlikEvery: 20, shashlikPlates: 2, smokeAfter: 4, draftChance: 0.02 },
   vape: { coughAfter: 10 },
-  lyokha: { wastedAt: 75, sober: 30, pukeEvery: 10, smashEvery: 6 },
+  lyokha: { warnBefore: 15, wastedAt: 75, sober: 30, pukeEvery: 10, smashEvery: 6 },
   alexey: { hogChance: 0.06, hogDrainEvery: 1.5, cryChance: 0.03 },
   kirill: { sleepChance: 0.05 },
 

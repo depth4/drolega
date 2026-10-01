@@ -144,7 +144,15 @@ export const CHARS = {
     name: 'Лёха', shirt: '#1e1e20', pants: '#1c1c1e', hair: '#a07a50', // clothes come from src/assets/skins/lyokha.png
     start: 'table2', prefs: { table: 6, sofa: 2, kitchen: 1, pc: 2.5, watch: 3 }, drinker: true,
     tick(f, g) {
-      if (!f.problem && !f.wasted && f.mode !== 'walk' && f.drunk >= TUNE.lyokha.wastedAt) startWasted(f, g);
+      // a warning first: he goes green and says so; feed him now (food in hand, E on him) and it passes
+      const L = TUNE.lyokha;
+      if (!f.wasted && !f.warned && f.drunk >= L.wastedAt - L.warnBefore) {
+        f.warned = true;
+        f.figure.say('Пацаны… мне чёт хреново…', 3);
+        g.toast('Лёха зеленеет — накорми его (еда в руках, E на нём), пока не поплыл', 'warn', f.room?.name);
+      }
+      if (f.warned && f.drunk < L.wastedAt - L.warnBefore - 10) f.warned = false;
+      if (!f.problem && !f.wasted && f.mode !== 'walk' && f.drunk >= L.wastedAt) startWasted(f, g);
     },
     wantsDrink: (f) => !f.wasted,
   },
@@ -494,6 +502,7 @@ export class Friend extends Walker {
     const loop = this.animLoop();
     this.figure.setLoop(loop);
     this.figure.setFace?.(this.faceState());
+    this.figure.setTint?.((this.warned && !this.wasted) || this.problem?.id === 'puke' ? '#a8f0a0' : '#ffffff');
     // small random gestures so nobody stands like a statue
     if (!this.problem && this.mode !== 'walk' && this.figure.pose !== 'lie' && (!loop || loop === 'dance' || loop === 'seatDance') && !this.figure.busy) {
       this.ambientT = (this.ambientT ?? rand(2, 6)) - dt;
@@ -731,7 +740,7 @@ export class Friend extends Walker {
     this.fun -= TUNE.fun.boredom * g.pace * dt;
     this.bladder += TUNE.bladder.base * g.pace * dt;
     this.drunk = clamp(this.drunk - 0.4 * dt);
-    if (g.state.music && this.room?.id === 'living') this.fun += TUNE.fun.music * dt;
+    if (g.state.music && this.room?.id === 'living') this.fun += (TUNE.fun.music + TUNE.living.musicFun * (g.state.volume - 1)) * dt;
     if (this.buzz > 0) {
       this.buzz -= dt;
       this.fun += TUNE.drink.beer.buzz * dt;
@@ -1028,7 +1037,13 @@ export class Cat extends Walker {
 
     if (room === 'balcony') {
       this.balconyT += dt;
-      if (this.balconyT >= C.climbAfter && this.mode !== 'walk' && this.playLeft <= 0 && this.spot?.id !== 'catRail' && this.problem?.id !== 'rail') {
+      // the sash is shut: he just sits on the windowsill; open: he climbs out
+      if (this.problem?.id === 'rail' && !g.living.windowOpen) {
+        this.clearProblem(true);
+        this.place(CAT_SPOTS.catBalcony);
+        this.balconyT = 0;
+      }
+      if (this.balconyT >= C.climbAfter && g.living.windowOpen && this.mode !== 'walk' && this.playLeft <= 0 && this.spot?.id !== 'catRail' && this.problem?.id !== 'rail') {
         this.walkTo(CAT_SPOTS.catRail, () => this.setProblem('rail', 'лезет в открытую створку на балконе!', 'В ОКНЕ', 0));
       }
       if (this.problem?.id === 'rail') {

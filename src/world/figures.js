@@ -249,6 +249,10 @@ function makeBoxPerson(opts) {
   return {
     root, body, arms, rig, ...tags,
     setFace,
+    // colour over the face: green when he's about to be sick
+    setTint(c) {
+      if (head.isSprite && head.material.color.getHexString() !== c.replace('#', '')) head.material.color.set(c);
+    },
     // k: 0 standing .. 1 flat on the floor; dir: where he falls, relative to where he faces (radians)
     setFall(k, dir = 0) {
       const a = k * Math.PI * 0.5;
