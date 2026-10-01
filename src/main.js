@@ -554,6 +554,6 @@ if (params.has('play')) {
   if (params.has('phone')) setPhone(true, false);
 } else if (attract) {
   game.olegPos = [99, 99];
-  for (let s = 0; s < 20; s += 0.05) game.update(0.05); // the guys have settled in by the time the title shows
+  for (let s = 0; s < 10; s += 0.05) game.update(0.05); // the guys have settled in by the time the title shows
 }
 requestAnimationFrame(frame);
