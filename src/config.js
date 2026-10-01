@@ -11,11 +11,11 @@ export const TUNE = {
   //   money / table / fridge: what Oleg starts with; from night 1 the table runs dry by mid-night without the courier
   //   events: which party events can happen (toast, quarrel, fire)
   NIGHTS: [
-    { pace: 1.0, trouble: 1.0, money: 2500, table: { beer: 4, vodka: 2, food: 1 }, fridge: { beer: 2, vodka: 0, food: 0, pelmeni: 1 }, events: ['toast'] },
-    { pace: 1.2, trouble: 1.5, money: 2300, table: { beer: 4, vodka: 2, food: 1 }, fridge: { beer: 1, vodka: 1, food: 0, pelmeni: 1 }, events: ['toast', 'quarrel'] },
-    { pace: 1.35, trouble: 2.0, money: 2100, table: { beer: 3, vodka: 2, food: 1 }, fridge: { beer: 1, vodka: 1, food: 0, pelmeni: 1 }, events: ['toast', 'quarrel', 'fire'] },
-    { pace: 1.55, trouble: 2.6, money: 1900, table: { beer: 3, vodka: 2, food: 0 }, fridge: { beer: 1, vodka: 0, food: 0, pelmeni: 1 }, events: ['toast', 'quarrel', 'fire'] },
-    { pace: 1.75, trouble: 3.2, money: 1700, table: { beer: 2, vodka: 2, food: 0 }, fridge: { beer: 1, vodka: 0, food: 0, pelmeni: 1 }, events: ['toast', 'quarrel', 'fire'] },
+    { pace: 0.95, trouble: 0.9, money: 3500, table: { beer: 6, vodka: 3, food: 2 }, fridge: { beer: 2, vodka: 1, food: 0, pelmeni: 1 }, events: ['toast'] },
+    { pace: 1.2, trouble: 1.5, money: 3600, table: { beer: 6, vodka: 2, food: 2 }, fridge: { beer: 2, vodka: 1, food: 0, pelmeni: 1 }, events: ['toast', 'quarrel'] },
+    { pace: 1.35, trouble: 2.0, money: 3800, table: { beer: 4, vodka: 3, food: 1 }, fridge: { beer: 2, vodka: 0, food: 0, pelmeni: 1 }, events: ['toast', 'quarrel', 'fire'] },
+    { pace: 1.55, trouble: 2.6, money: 4000, table: { beer: 4, vodka: 2, food: 1 }, fridge: { beer: 1, vodka: 1, food: 0, pelmeni: 1 }, events: ['toast', 'quarrel', 'fire'] },
+    { pace: 1.75, trouble: 3.2, money: 4200, table: { beer: 4, vodka: 2, food: 1 }, fridge: { beer: 1, vodka: 0, food: 0, pelmeni: 1 }, events: ['toast', 'quarrel', 'fire'] },
   ],
 
   start: {
@@ -72,14 +72,19 @@ export const TUNE = {
   photo: { perNight: 3, fun: 8, friendFun: 6, range: 7, cone: 0.32 },
 
   // hands-on actions (hold the left mouse button): strength spent per second / per pat
-  hands: { hoseLength: 4.6, sprayRange: 3.2, sprayCost: 5, soak: 0.28, scrubCost: 4, scrubRate: 0.0022, patCost: 3, pats: 5, shakeCost: 5, shakeRate: 0.004 },
+  hands: { hoseLength: 4.6, sprayRange: 3.2, sprayCost: 5, soak: 0.28, scrubCost: 4, scrubRate: 0.0022, patCost: 3, pats: 5, shakeCost: 5, shakeRate: 0.004, wakeHold: 0.4 },
   // mini-games slow the world down instead of pausing it
   minigame: { timeScale: 0.35 },
 
   bladder: { base: 0.3, waitMax: 18, sip: 7 },
 
   // the guys get thirsty and hungry and go to the table by themselves; an empty table = a "!"
-  needs: { thirst: 1.3, hunger: 0.6, goAt: 55, wantAt: 90, sip: 30, plate: 45, give: 70 },
+  // sipAt / eatAt: at the table he only takes a sip / a plate once he's this thirsty / hungry
+  needs: { thirst: 1.0, hunger: 0.55, goAt: 55, wantAt: 90, sip: 35, plate: 45, give: 70, sipAt: 40, eatAt: 35 }, // x night pace
+
+  // Oleg's PC: the upgrader site keeps a cut (edge), buys back skins for less (sell);
+  // fun for the guy spinning (per second) and for the ones watching a win / a loss; КС duel
+  pc: { edge: 0.9, sell: 0.85, playFun: 0.8, winFun: 10, loseFun: 3, csKills: 6, csWin: 15, csWatch: 10, watchFun: 0.7 },
 
   // party events (which ones run on a night: NIGHTS[n].events)
   events: {
@@ -135,10 +140,10 @@ export const TUNE = {
   delivery: { min: 15, max: 30 }, // seconds; not opening the door = courier leaves, money is gone
 
   shop: [
-    { id: 'beer', icon: 'beer', title: 'Пиво ×4', note: 'держит долго, пьянит медленно', price: 800, gives: { beer: 4 } },
-    { id: 'vodka', icon: 'vodka', title: 'Водка 0,5', note: 'дёшево, пьянит быстро', price: 400, gives: { vodka: 1 } },
-    { id: 'pizza', icon: 'pizza', title: 'Пицца', note: 'готовая, сразу на стол', price: 700, gives: { food: 1 } },
-    { id: 'pelmeni', icon: 'pelmeni', title: 'Пельмени', note: 'дёшево, но варить и сливать самому', price: 250, gives: { pelmeni: 1 } },
+    { id: 'beer', icon: 'beer', title: 'Пиво ×4', note: 'держит долго, пьянит медленно', price: 600, gives: { beer: 4 } },
+    { id: 'vodka', icon: 'vodka', title: 'Водка 0,5', note: 'дёшево, пьянит быстро', price: 300, gives: { vodka: 1 } },
+    { id: 'pizza', icon: 'pizza', title: 'Пицца', note: 'готовая, сразу на стол', price: 500, gives: { food: 1 } },
+    { id: 'pelmeni', icon: 'pelmeni', title: 'Пельмени', note: 'дёшево, но варить и сливать самому', price: 180, gives: { pelmeni: 1 } },
     { id: 'pills', title: 'Таблетки от ЗПП', note: 'скоро', price: 600, gives: { pills: 1 }, soon: true },
   ],
 

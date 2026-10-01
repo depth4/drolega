@@ -49,7 +49,9 @@ let phoneBob = 0;
 const fx = makeFX(renderer, scene, camera);
 const hud = createHUD({ onBuy: (id) => game.buy(id) });
 // close-up hands-on scenes (pelmeni): the mouse is free, the camera flies in, the world slows down
-const focusActive = () => !!game.cooking.focus;
+// close-ups where the camera flies to something and the mouse works on it: the pelmeni pot, the PC
+const focuser = () => (game.cooking.focus ? game.cooking : game.pc.focus ? game.pc : null);
+const focusActive = () => !!focuser();
 const mini = { get active() { return focusActive(); } };
 const mouseNdc = new THREE.Vector2();
 canvas.addEventListener('mousemove', (e) => {
@@ -62,6 +64,7 @@ window.__game = game; // handy in the console
 window.__player = player;
 window.__spots = SPOTS;
 window.__three = THREE; // debugging: raycasts from the console
+window.__tune = TUNE; // balance numbers, live
 
 const orbit = new OrbitControls(orbitCam, canvas);
 orbit.target.set(CENTER.x, 0, CENTER.z);
@@ -172,19 +175,6 @@ for (const b of document.querySelectorAll('#night-pick [data-night]')) {
 }
 $('btn-orbit').addEventListener('click', toOrbit);
 
-// character look: cube heads with photo faces, or Doom-style pixel sprites
-const STYLE_NAMES = { box: 'Бошки: кубы', sprite: 'Бошки: плоские (как в Doom)' };
-function setStyle(style) {
-  game.restyle(style);
-  mirror?.restyle(style);
-  $('btn-style').textContent = STYLE_NAMES[style];
-  try {
-    localStorage.setItem('oleg-style', style);
-  } catch {
-    /* no storage: the choice just isn't remembered */
-  }
-}
-$('btn-style').addEventListener('click', () => setStyle(game.style === 'box' ? 'sprite' : 'box'));
 $('btn-back').addEventListener('click', pause);
 $('btn-next').addEventListener('click', () => {
   const win = game.over?.win;
@@ -287,7 +277,7 @@ addEventListener('keydown', (e) => {
   if (e.repeat) return;
   const k = e.code;
   if (focusActive()) {
-    if (k === 'Escape') game.cooking.cancel();
+    if (k === 'Escape') focuser().cancel();
     return;
   }
   if (k === 'KeyC' && !phoneOpen) return setPhotoMode(!photoMode);
@@ -367,7 +357,7 @@ function frame(now) {
   time += dt;
 
   if (mode === 'play') {
-    game.update(mini.active ? dt * TUNE.minigame.timeScale : dt);
+    game.update(game.cooking.focus ? dt * TUNE.minigame.timeScale : dt); // at the PC the party doesn't wait
     // listening to a story: Oleg turns to the guy and can't walk away until the lock ends
     const listening = game.talkLocked;
     if (listening) {
@@ -381,7 +371,7 @@ function frame(now) {
     if (focusActive()) {
       // fly to the close-up and hand the mouse over to the objects
       if (locked) document.exitPointerLock?.();
-      const f = game.cooking.focus;
+      const f = focuser().focus;
       camera.position.lerp(f.cam.pos, Math.min(1, dt * 6));
       const q = camera.quaternion.clone();
       camera.lookAt(f.cam.look);
@@ -398,8 +388,10 @@ function frame(now) {
     }
     focusRay.setFromCamera(focusActive() ? mouseNdc : center, camera);
     game.cooking.update(dt, { ray: focusRay.ray, down: use.down, dx: use.fx, dy: use.fy });
+    game.pc.update(dt, { ray: game.pc.focus ? focusRay.ray : null, pressed: game.pc.focus && use.pressed });
     use.fx = use.fy = 0;
-    if (focusActive()) hud.setUse({ label: game.cooking.hint(), progress: game.cooking.progress(), top: true });
+    if (focusActive()) hud.setUse({ label: focuser().hint(), progress: focuser().progress(), top: true });
+    document.body.classList.toggle('focus', focusActive()); // close-up: no hotbar in the way
     const k = player.keys;
     hands.update(dt, {
       item: game.inv.selectedItem(),
@@ -426,8 +418,8 @@ function frame(now) {
     const dir = camera.getWorldDirection(new THREE.Vector3());
     const handHud = game.hands.update(dt, { down: use.down, pressed: use.pressed, mx: use.mx, my: use.my, target, origin, dir, hand: hands.tip() });
     const held = game.inv.selectedItem();
-    use.busy = (held === 'mop' && target?.puddle) || (!held && target?.friend?.problem?.id === 'sleep');
-    hands.setActivity({ spray: held === 'shower' && use.down, scrub: use.down && held === 'mop' && target?.puddle ? 1 : 0, shake: use.down && !held && target?.friend?.problem?.id === 'sleep' ? 1 : 0, mx: use.mx, my: use.my });
+    use.busy = (held === 'mop' && target?.puddle) || (!held && target?.friend?.problem?.id === 'sleep') || !!game.hands.grab;
+    hands.setActivity({ spray: held === 'shower' && use.down, scrub: use.down && held === 'mop' && target?.puddle ? 1 : 0, shake: use.down && !held && (game.hands.grab || target?.friend?.problem?.id === 'sleep') ? 1 : 0, mx: use.mx, my: use.my });
     if (game.handAnim) {
       hands.play(game.handAnim);
       game.handAnim = null;
@@ -484,13 +476,8 @@ function frame(now) {
 }
 
 // ---------- boot ----------
-try {
-  game.style = params.get('heads') ?? localStorage.getItem('oleg-style') ?? 'box';
-} catch {
-  game.style = params.get('heads') ?? 'box';
-}
-if (!STYLE_NAMES[game.style]) game.style = 'box';
-$('btn-style').textContent = STYLE_NAMES[game.style];
+// heads are flat Doom-style cut-outs that turn to the camera (the cube-head style is kept for ?heads=box)
+game.style = params.get('heads') === 'box' ? 'box' : 'sprite';
 mirror = createMirror({ furn, scene, hands, style: game.style });
 startNight(Number(params.get('night')) || 1);
 started = false; // the menu offers "start", not "continue"

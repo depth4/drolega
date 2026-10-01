@@ -122,6 +122,9 @@ const ACTIVITIES = {
   anime: { spots: ['olegBed'], dur: [15, 25], label: 'смотрит аниме', fun: 0.9 },
   vape: { spots: ['balcony', 'bathStand'], dur: [10, 16], label: 'парит вейп', fun: 0.6 },
   toilet: { spots: ['toilet'], dur: [3, 5], label: 'в туалете' },
+  // Oleg's PC (src/game/pc.js): one spins the upgrader on Oleg's money, the others come and watch
+  pc: { spots: ['pcChair'], dur: [25, 40], label: 'лудит в апгрейдер', when: (g, f) => !g.pc.busy() && g.state.money >= 50 && !(f.pcBan > g.state.t) },
+  watch: { spots: ['pcWatch1', 'pcWatch2'], dur: [10, 18], label: 'смотрит, как лудят', fun: TUNE.pc.watchFun, when: (g) => g.pc.busy() },
 };
 
 // ---------- characters ----------
@@ -129,7 +132,7 @@ const ACTIVITIES = {
 export const CHARS = {
   alexey: {
     name: 'Алексей', shirt: '#b3352d', hair: '#2a1a10',
-    start: 'table1', prefs: { table: 7, sofa: 2, balcony: 1, kitchen: 1 }, drinker: true,
+    start: 'table1', prefs: { table: 7, sofa: 2, balcony: 1, kitchen: 1, pc: 1.5, watch: 3 }, drinker: true,
     tick(f, g, dt) {
       const T = TUNE.alexey;
       if (f.problem) return;
@@ -139,7 +142,7 @@ export const CHARS = {
   },
   lyokha: {
     name: 'Лёха', shirt: '#1e1e20', pants: '#1c1c1e', hair: '#a07a50', // clothes come from src/assets/skins/lyokha.png
-    start: 'table2', prefs: { table: 6, sofa: 2, kitchen: 1 }, drinker: true,
+    start: 'table2', prefs: { table: 6, sofa: 2, kitchen: 1, pc: 2.5, watch: 3 }, drinker: true,
     tick(f, g) {
       if (!f.problem && !f.wasted && f.mode !== 'walk' && f.drunk >= TUNE.lyokha.wastedAt) startWasted(f, g);
     },
@@ -147,12 +150,12 @@ export const CHARS = {
   },
   kirill: {
     name: 'Кирилл', shirt: '#2f5c9e', hair: '#1c1c1c', drinkFaceId: 'kirillDrink',
-    start: 'sofaA', prefs: { grill: 6, anime: 3, table: 2, sofa: 1 }, drinker: true,
+    start: 'sofaA', prefs: { grill: 6, anime: 3, table: 2, sofa: 1, pc: 1, watch: 2 }, drinker: true,
     needsBooze: false, // drinks when there is booze, but an empty table doesn't upset him
   },
   temych: {
     name: 'Темыч', shirt: '#6b3fa0', hair: '#a07040',
-    start: 'sofaB', prefs: { vape: 5, sofa: 3, table: 3 }, drinker: true,
+    start: 'sofaB', prefs: { vape: 5, sofa: 3, table: 3, pc: 2, watch: 3 }, drinker: true,
     quotes: ['Сука. Пацаны, на следующей неделе также…', 'Сукааааа', 'СУКААААА'], // text for his quote clip
   },
 };
@@ -298,7 +301,7 @@ const PROBLEMS = {
   },
   sleep(f, g, text = 'уснул под аниме') {
     return {
-      id: 'sleep', text: `${text} — зажми ЛКМ и потряси его`, short: 'СПИТ', drain: 1.2,
+      id: 'sleep', text: `${text} — наведись и зажми ЛКМ, растолкаешь`, short: 'СПИТ', drain: 1.2,
       actions: () => [],
     };
   },
@@ -536,6 +539,7 @@ export class Friend extends Walker {
     const a = this.activity;
     this.activity = null;
     if (a?.id === 'grill') this.game.grill.lit = false;
+    if (a?.id === 'pc') this.game.pc.standFriend(this);
     if (!silent && this.mode !== 'walk') this.leaveSoon = rand(0.5, 1.5);
   }
 
@@ -561,6 +565,10 @@ export class Friend extends Walker {
       g.grill.lit = true;
       g.grill.heat = 100;
     }
+    if (id === 'pc') {
+      if (g.pc.busy()) return this.endActivity(true);
+      g.pc.sitFriend(this);
+    }
     if (id === 'vape') {
       const door = this.activity.spot.id === 'balcony' ? g.doors.balcony : g.doors.bath;
       if (door.open) {
@@ -579,7 +587,7 @@ export class Friend extends Walker {
     }
     const N = TUNE.needs;
     if ((this.thirst > N.goAt || this.hunger > N.goAt) && (this.startActivity('table') || this.startActivity('sofa'))) return;
-    const options = Object.entries(this.def.prefs).filter(([id]) => ACTIVITIES[id].spots.some((s) => this.spotFree(s)));
+    const options = Object.entries(this.def.prefs).filter(([id]) => (!ACTIVITIES[id].when || ACTIVITIES[id].when(this.game, this)) && ACTIVITIES[id].spots.some((s) => this.spotFree(s)));
     if (!options.length) return;
     this.startActivity(pickWeighted(options));
   }
@@ -729,7 +737,7 @@ export class Friend extends Walker {
       const every = TUNE.drinkEvery[this.id] / g.pace;
       const wants = this.def.drinker && (this.def.wantsDrink?.(this) ?? true);
       const N = TUNE.needs;
-      if (wants && a.t >= every && this.problem?.id !== 'hog' && this.thirst > 15) {
+      if (wants && a.t >= every && this.problem?.id !== 'hog' && this.thirst > N.sipAt) {
         a.t = 0;
         const tb = g.state.table;
         const kind = tb.beer > 0 && tb.vodka > 0 ? (Math.random() < 0.5 ? 'beer' : 'vodka') : tb.beer > 0 ? 'beer' : tb.vodka > 0 ? 'vodka' : null;
@@ -740,7 +748,7 @@ export class Friend extends Walker {
           this.bladder += TUNE.bladder.sip;
         } else if (this.def.needsBooze !== false && this.thirst > N.wantAt && !this.problem) this.setProblem(PROBLEMS.want(this, g, 'booze'));
       }
-      if (a.plateT >= D.plateEvery && this.hunger > 20) {
+      if (a.plateT >= D.plateEvery && this.hunger > N.eatAt) {
         a.plateT = 0;
         if (g.state.table.food > 0) {
           g.state.table.food -= 1;
@@ -751,6 +759,8 @@ export class Friend extends Walker {
         } else if (this.hunger > N.wantAt && !this.problem) this.setProblem(PROBLEMS.want(this, g, 'food'));
       }
     }
+
+    if (a.id === 'pc') g.pc.friendTick(this, dt);
 
     if (a.id === 'grill') {
       const G = TUNE.grill;

@@ -10,6 +10,7 @@ import { icon } from '../ui/icons.js';
 import { Interactions } from './interact.js';
 import { Cooking } from './cooking.js';
 import { PartyEvents } from './events.js';
+import { PC } from './pc.js';
 
 export const ITEMS = {
   beer: { name: 'Пиво', icon: '🍺' },
@@ -97,7 +98,7 @@ export class Game {
     this.toastKeys = {};
     this.onEnd = null;
     this.night = 1;
-    this.style = 'box';
+    this.style = 'sprite';
     this.friends = [];
     this.inv = new Inventory(this);
     this.olegPos = [0, 0];
@@ -115,6 +116,7 @@ export class Game {
     this.dynamic.add(this.toy);
     this.buildBucket();
     this.events = new PartyEvents(this);
+    this.pc = new PC(this);
   }
 
   // ---------- the bucket (for the balcony fire) ----------
@@ -220,6 +222,9 @@ export class Game {
     this.over = null;
     this.orders = [];
     this.visitor?.figure && this.dynamic.remove(this.visitor.figure.root);
+    for (const l of this.leaving ?? []) this.dynamic.remove(l.figure.root);
+    this.leaving = [];
+    this.visitorGap = 0;
     this.visitor = null;
     this.visitorQueue = [];
     this.pending = [];
@@ -227,6 +232,7 @@ export class Game {
     this.grill = { lit: false, heat: 0 };
     particles.clear();
     this.events?.reset();
+    this.pc?.reset();
     this.placeBucket(...this.bucketHome);
     for (const p of this.puddles ?? []) this.dynamic.remove(p);
     this.puddles = [];
@@ -664,11 +670,16 @@ export class Game {
     setTimeout(() => this.voices?.play('event_puke', { pos: [...f.pos] }), 1200); // after the splash, not before
   }
 
+  // the visitor turns and walks off down the stairs; the next one comes up only after that
   dismissVisitor() {
     const v = this.visitor;
     if (!v) return;
     this.visitor = null;
-    setTimeout(() => this.dynamic.remove(v.figure.root), 1500);
+    this.visitorGap = 1.8;
+    const [dx, dz] = this.doors.entrance.center, [x, z] = VISITOR_SPOT;
+    const away = Math.atan2(x - dx, z - dz);
+    v.figure.root.rotation.y = away;
+    this.leaving = [...(this.leaving ?? []), { figure: v.figure, dir: [Math.sin(away), Math.cos(away)], t: 1.6 }];
   }
 
   openEntrance() {
@@ -1059,8 +1070,17 @@ export class Game {
     }
     this.orders = this.orders.filter((x) => !x.done);
 
-    // visitor at the door
-    if (!this.visitor && this.visitorQueue.length) this.showVisitor(this.visitorQueue.shift());
+    // visitor at the door (one at a time: the next waits until the last one has walked off)
+    for (const l of this.leaving ?? []) {
+      l.t -= dt;
+      l.figure.root.position.x += l.dir[0] * 1.2 * dt;
+      l.figure.root.position.z += l.dir[1] * 1.2 * dt;
+      l.figure.update(dt, { walking: true, speed: 1.2 });
+      if (l.t <= 0) this.dynamic.remove(l.figure.root);
+    }
+    this.leaving = (this.leaving ?? []).filter((l) => l.t > 0);
+    this.visitorGap = Math.max(0, (this.visitorGap ?? 0) - dt);
+    if (!this.visitor && this.visitorQueue.length && this.visitorGap <= 0) this.showVisitor(this.visitorQueue.shift());
     const v = this.visitor;
     if (v) {
       v.left -= dt;

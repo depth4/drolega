@@ -95,11 +95,16 @@ const BUILD = {
     f.box(0.1, U - 0.55, 0.72, 0.76, 0.02, 0.65, M.wood);
     f.box(0.1, 0.14, 0, 0.72, 0.02, 0.65, M.wood);
     f.box(U - 0.59, U - 0.55, 0, 0.72, 0.02, 0.65, M.wood);
-    f.box(0.45, 0.95, 0.76, 1.14, 0.08, 0.48, mat('#cfc8b8', { roughness: 0.5 })); // CRT
-    f.box(0.5, 0.9, 0.81, 1.1, 0.48, 0.49, M.screen);
-    f.box(0.4, 1.0, 0.76, 0.78, 0.52, 0.64, M.black); // keyboard
-    f.box(0.18, 0.38, 0, 0.45, 0.08, 0.55, mat('#d8d2c2')); // system unit
-    f.box(0.55, 0.95, 0.42, 0.47, 0.8, 1.2, M.black); // chair
+    // gaming PC: flat monitor (its screen is drawn by src/game/pc.js), RGB tower, gaming chair
+    f.box(0.62, 0.78, 0.76, 0.775, 0.12, 0.3, M.black); // stand base
+    f.box(0.685, 0.715, 0.775, 0.93, 0.16, 0.19, M.black); // stand neck
+    f.box(0.34, 1.06, 0.88, 1.32, 0.19, 0.22, M.black).userData.pcMonitor = true; // bezel, 0.72 x 0.44
+    f.box(0.36, 1.04, 0.9, 1.3, 0.22, 0.222, M.screen).userData.pcScreen = true;
+    f.box(0.4, 1.0, 0.76, 0.78, 0.4, 0.55, M.black); // keyboard
+    f.box(1.08, 1.16, 0.76, 0.775, 0.42, 0.52, M.black); // mouse
+    f.box(0.16, 0.38, 0, 0.5, 0.08, 0.55, mat('#1b1d22', { roughness: 0.4 })); // tower
+    f.box(0.16, 0.38, 0.05, 0.45, 0.55, 0.552, mat('#7a2cff', { emissive: '#7a2cff', emissiveIntensity: 1.2 })); // RGB strip
+    f.box(0.55, 0.95, 0.42, 0.47, 0.8, 1.2, M.black).userData.pcChair = true; // chair
     f.box(0.55, 0.95, 0.47, 0.95, 1.18, 1.22, M.black);
     f.cyl(0.75, 1.0, 0, 0.42, 0.03, 0.03, M.metal);
   },

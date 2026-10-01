@@ -185,22 +185,27 @@ export class Interactions {
       hud = { label: 'Хлопай ЛКМ по спине, в ритм', progress: (p.pats ?? 0) / T.pats };
     }
 
-    // ---- shaking a sleeping guy awake
-    if (!held && friend?.problem?.id === 'sleep') {
-      const p = friend.problem;
+    // ---- shaking a sleeping guy awake: hold LMB on him (he stays grabbed while the button is down);
+    // shaking the mouse left-right wakes him faster
+    if (!input.down) this.grab = null;
+    const sleeper = (input.down && this.grab) || (friend?.problem?.id === 'sleep' ? friend : null);
+    if (!held && sleeper?.problem?.id === 'sleep') {
+      const p = sleeper.problem;
       p.wake ??= 0;
-      if (input.down && Math.abs(input.mx) > 1 && this.energy(T.shakeCost * dt)) {
-        p.wake += Math.abs(input.mx) * T.shakeRate;
-        friend.shake = Math.min(1, (friend.shake ?? 0) + Math.abs(input.mx) * 0.02);
-      }
-      p.wake = Math.max(0, p.wake - dt * 0.12);
+      if (input.down && this.energy(T.shakeCost * dt)) {
+        this.grab = sleeper;
+        p.wake += dt * T.wakeHold + Math.abs(input.mx) * T.shakeRate;
+        sleeper.shake = Math.min(1, (sleeper.shake ?? 0) + dt * 2 + Math.abs(input.mx) * 0.02);
+      } else p.wake = Math.max(0, p.wake - dt * 0.12);
       if (p.wake >= 1) {
-        friend.fun += 5;
-        friend.clearProblem(true);
-        friend.endActivity();
-        friend.figure.play('shout');
+        this.grab = null;
+        sleeper.fun += 5;
+        sleeper.clearProblem(true);
+        sleeper.endActivity();
+        sleeper.figure.play('shout');
+        sleeper.figure.say('А? Чё? Я не сплю!', 2);
       }
-      hud = { label: 'Зажми ЛКМ и тряси мышкой влево-вправо', progress: Math.min(1, p.wake) };
+      hud = { label: input.down ? 'Расталкиваешь… (тряси мышью — быстрее)' : 'Зажми ЛКМ — растолкать', progress: Math.min(1, p.wake) };
     }
 
     return hud;
