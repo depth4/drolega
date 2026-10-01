@@ -112,8 +112,6 @@ for (const [path, src] of Object.entries(FILES)) {
 }
 
 export const hasMoodFaces = (who) => !!STATES[who];
-// Qwen heads come with a neck (sunk into the collar); photo cut-outs end at the chin and sit on the body's neck
-export const moodHasNeck = (who) => who === 'kirill';
 // best available picture for this state: the state itself, else default, else null (use the old photo)
 export const moodState = (who, state) => (STATES[who]?.[state] ? state : STATES[who]?.default ? 'default' : null);
 

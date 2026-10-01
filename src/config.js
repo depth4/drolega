@@ -3,16 +3,25 @@
 export const TUNE = {
   nightSeconds: 180, // 22:00 -> 06:00
   nights: 5,
-  baseDifficulty: 0.7, // night 1 problem chance multiplier
-  difficultyPerNight: 0.2, // problem chances grow by this each night
-  warmup: { calm: 20, ramp: 50, min: 0.15 }, // first seconds are calm, then chaos ramps up over `ramp` seconds
+  warmup: { calm: 6, ramp: 25, min: 0.35 }, // first seconds are calmer, then trouble ramps up over `ramp` seconds
+
+  // Every night is its own setup.
+  //   pace: how fast everything burns (boredom, thirst, hunger, bladder, Oleg's thirst, the grill, drinking)
+  //   trouble: how often problems start (crying, hogging, falling asleep, fire...)
+  //   money / table / fridge: what Oleg starts with; from night 1 the table runs dry by mid-night without the courier
+  //   events: which party events can happen (toast, quarrel, fire)
+  NIGHTS: [
+    { pace: 1.0, trouble: 1.0, money: 2500, table: { beer: 4, vodka: 2, food: 1 }, fridge: { beer: 2, vodka: 0, food: 0, pelmeni: 1 }, events: ['toast'] },
+    { pace: 1.2, trouble: 1.5, money: 2300, table: { beer: 4, vodka: 2, food: 1 }, fridge: { beer: 1, vodka: 1, food: 0, pelmeni: 1 }, events: ['toast', 'quarrel'] },
+    { pace: 1.35, trouble: 2.0, money: 2100, table: { beer: 3, vodka: 2, food: 1 }, fridge: { beer: 1, vodka: 1, food: 0, pelmeni: 1 }, events: ['toast', 'quarrel', 'fire'] },
+    { pace: 1.55, trouble: 2.6, money: 1900, table: { beer: 3, vodka: 2, food: 0 }, fridge: { beer: 1, vodka: 0, food: 0, pelmeni: 1 }, events: ['toast', 'quarrel', 'fire'] },
+    { pace: 1.75, trouble: 3.2, money: 1700, table: { beer: 2, vodka: 2, food: 0 }, fridge: { beer: 1, vodka: 0, food: 0, pelmeni: 1 }, events: ['toast', 'quarrel', 'fire'] },
+  ],
 
   start: {
     totalFun: 70,
     hut: 100,
-    money: 3000,
-    fridge: { beer: 4, vodka: 1, food: 1, pelmeni: 1 }, // bottles / ready food / raw packs
-    table: { beer: 6, vodka: 5, food: 2 }, // servings and plates on the party table
+    // money, fridge (bottles / ready food / raw packs) and table (servings / plates): per night, see NIGHTS
     friendFun: 75,
     catFun: 80,
   },
@@ -23,9 +32,9 @@ export const TUNE = {
   },
 
   fun: {
-    boredom: 0.38, // everyone loses this much fun per second
-    music: 0.9, // bonus in the living room while music plays
-    olegBoredom: 0.35,
+    boredom: 0.5, // everyone loses this much fun per second (x night pace)
+    music: 0.7, // bonus in the living room while music plays
+    olegBoredom: 0.5,
     helpBonus: 8, // Oleg's fun for solving someone's problem
   },
 
@@ -53,7 +62,7 @@ export const TUNE = {
   // Oleg's strength: every real action costs some, it comes back by itself; food and a drink give a boost
   energy: { max: 100, regen: 1.8, fromFood: 35, fromBeer: 12, fromVodka: 6 },
   // Oleg wants a drink too: thirst grows, and when it's high his fun melts; a drink (Q) quenches it
-  olegThirst: { rate: 0.9, from: 60, drain: 1.6, beer: 55, vodka: 80 },
+  olegThirst: { rate: 1.4, from: 45, drain: 2.6, beer: 55, vodka: 80 }, // rate x night pace
   cost: {
     takeBottle: 6, comfort: 6, lead: 8, fan: 6, wake: 10, pat: 8, shower: 14, repair: 14, mop: 10,
     cook: 12, drain: 6, petCat: 4, catRescue: 5,
@@ -71,6 +80,15 @@ export const TUNE = {
 
   // the guys get thirsty and hungry and go to the table by themselves; an empty table = a "!"
   needs: { thirst: 1.3, hunger: 0.6, goAt: 55, wantAt: 90, sip: 30, plate: 45, give: 70 },
+
+  // party events (which ones run on a night: NIGHTS[n].events)
+  events: {
+    every: [28, 45], // seconds between events (x night pace)
+    toastWindow: 16, toastReach: 2.6, toastFun: 14, toastOlegFun: 12, toastMiss: 8,
+    quarrelDrunk: 35, quarrelTime: 15, separate: 1.2, fightNoise: 20, fightFun: 15,
+    fireNotBefore: 40, fireChance: 0.01, fireGrow: 0.03, fireHut: 1.2, fireNoise: 2, fireBurnout: 15, fireDisaster: 25,
+    splashRadius: 1.4, splashPower: 0.55, fillTime: 2,
+  },
 
   // "Коч!" chain: someone yells, others pick it up with a fading chance
   koch: { firstAfter: 25, every: [35, 60], chance: 0.85, decay: 0.8, max: 6, fun: 5, olegFun: 2, noise: 6 },
@@ -130,8 +148,8 @@ export const TUNE = {
   grill: { decay: 3.5, lowAt: 25, shashlikEvery: 20, shashlikPlates: 2, smokeAfter: 4, draftChance: 0.02 },
   vape: { coughAfter: 10 },
   lyokha: { wastedAt: 75, sober: 30, pukeEvery: 10, smashEvery: 6 },
-  alexey: { hogChance: 0.05, hogDrainEvery: 1.5, cryChance: 0.015 },
-  kirill: { sleepChance: 0.04 },
+  alexey: { hogChance: 0.06, hogDrainEvery: 1.5, cryChance: 0.03 },
+  kirill: { sleepChance: 0.05 },
 
   cat: {
     boredom: 0.7,

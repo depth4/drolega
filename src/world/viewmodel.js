@@ -4,7 +4,7 @@
 import * as THREE from 'three';
 import { mat } from './apartment.js';
 import { makeProp } from './anim.js';
-import { makePlate, makeToy, makeCat } from './figures.js';
+import { makePlate, makeToy, makeCat, makeBucket } from './figures.js';
 
 function item(type) {
   const g = new THREE.Group();
@@ -36,6 +36,13 @@ function item(type) {
     c.rotation.set(0, Math.PI * 0.6, 0);
     c.position.set(-0.12, -0.12, -0.05);
     g.add(c);
+  } else if (type === 'bucket' || type === 'water') {
+    // held by the handle, hanging below the fist
+    const b = makeBucket();
+    b.userData.water.visible = type === 'water';
+    b.scale.setScalar(0.9);
+    b.position.set(0.02, -0.3, -0.02);
+    g.add(b);
   } else if (type === 'toy') {
     const t = makeToy();
     t.scale.setScalar(1.4);

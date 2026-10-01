@@ -5,7 +5,7 @@ import { makePerson, makeCat } from '../world/figures.js';
 import { route } from './nav.js';
 import { NAV } from '../world/layout.js';
 
-const nearestNode = (x, z) => Object.entries(NAV).reduce((b, [k, [nx, nz]]) => (Math.hypot(nx - x, nz - z) < b.d ? { k, d: Math.hypot(nx - x, nz - z) } : b), { k: 'living', d: 1e9 }).k;
+export const nearestNode = (x, z) => Object.entries(NAV).reduce((b, [k, [nx, nz]]) => (Math.hypot(nx - x, nz - z) < b.d ? { k, d: Math.hypot(nx - x, nz - z) } : b), { k: 'living', d: 1e9 }).k;
 
 export const rand = (a, b) => a + Math.random() * (b - a);
 export const chance = (perSec, dt) => Math.random() < perSec * dt;
@@ -657,11 +657,12 @@ export class Friend extends Walker {
   needs(dt) {
     const N = TUNE.needs;
     const drinks = this.def.drinker && (this.def.wantsDrink?.(this) ?? true);
-    if (drinks) this.thirst = Math.min(100, this.thirst + N.thirst * dt);
-    this.hunger = Math.min(100, this.hunger + N.hunger * dt);
+    const pace = this.game.pace;
+    if (drinks) this.thirst = Math.min(100, this.thirst + N.thirst * pace * dt);
+    this.hunger = Math.min(100, this.hunger + N.hunger * pace * dt);
     const act = this.activity?.id;
     const interruptible = !act || ['sofa', 'kitchen', 'balcony', 'anime'].includes(act);
-    if (!this.problem && this.mode !== 'walk' && interruptible && (this.thirst > N.wantAt - 15 || this.hunger > N.wantAt - 15)) {
+    if (!this.problem && !this.event && this.mode !== 'walk' && interruptible && (this.thirst > N.wantAt - 15 || this.hunger > N.wantAt - 15)) {
       if (act === 'sofa') return; // the sofa is next to the table: he reaches from there
       if (act) this.endActivity(true);
       if (!this.startActivity('table')) this.startActivity('sofa');
@@ -672,8 +673,8 @@ export class Friend extends Walker {
     const g = this.game;
     this.t += dt;
     this.talkCooldown -= dt;
-    this.fun -= TUNE.fun.boredom * dt;
-    this.bladder += TUNE.bladder.base * dt;
+    this.fun -= TUNE.fun.boredom * g.pace * dt;
+    this.bladder += TUNE.bladder.base * g.pace * dt;
     this.drunk = clamp(this.drunk - 0.4 * dt);
     if (g.state.music && this.room?.id === 'living') this.fun += TUNE.fun.music * dt;
     if (this.buzz > 0) {
@@ -701,6 +702,8 @@ export class Friend extends Walker {
         this.lurch = 0.8;
         this.figure.play('stumble');
       } else this.stepWalk(dt * (1 - 0.35 * d * (0.5 + 0.5 * Math.sin(this.t * 1.9))));
+    } else if (this.event) {
+      // at a party event (toast, quarrel): stays where it put him, see events.js
     } else if (this.activity) this.tickActivity(dt);
     else if (!this.problem) {
       this.leaveSoon = (this.leaveSoon ?? 0) - dt;
@@ -723,7 +726,7 @@ export class Friend extends Walker {
     if (a.id === 'table' || a.id === 'sofa') { // the sofa is right by the table
       a.t += dt;
       a.plateT += dt;
-      const every = TUNE.drinkEvery[this.id];
+      const every = TUNE.drinkEvery[this.id] / g.pace;
       const wants = this.def.drinker && (this.def.wantsDrink?.(this) ?? true);
       const N = TUNE.needs;
       if (wants && a.t >= every && this.problem?.id !== 'hog' && this.thirst > 15) {
@@ -751,7 +754,7 @@ export class Friend extends Walker {
 
     if (a.id === 'grill') {
       const G = TUNE.grill;
-      g.grill.heat = Math.max(0, g.grill.heat - G.decay * dt);
+      g.grill.heat = Math.max(0, g.grill.heat - G.decay * g.pace * dt);
       if (g.grill.heat >= G.lowAt) {
         this.fun += 0.6 * dt;
         a.cook += dt;

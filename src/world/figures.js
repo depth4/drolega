@@ -2,7 +2,7 @@
 // People face local +z (Object3D.lookAt points +z at the target).
 import * as THREE from 'three';
 import { mat } from './apartment.js';
-import { drawFace, faceAspect, hasMoodFaces, moodState, moodFace, moodHasNeck } from './faces.js';
+import { drawFace, faceAspect, hasMoodFaces, moodState, moodFace } from './faces.js';
 import { createRig } from './anim.js';
 import { iconTexture, hasRealIcon } from '../ui/icons.js';
 
@@ -214,9 +214,8 @@ function makeBoxPerson(opts) {
         head.material.map = moodTex[state];
         head.material.needsUpdate = true;
         head.scale.set(HH * f.aspect, HH, 1);
-        const neck = moodHasNeck(who); // with its own neck: sit it in the collar
-        head.position.y = neck ? -0.1 : -0.01;
-        rig.neckMesh.visible = !neck;
+        head.position.y = -0.1; // mood heads come with their own short neck: sit it in the collar
+        rig.neckMesh.visible = false;
       } else {
         faceMat.map = moodTex[state];
         faceMat.needsUpdate = true;
@@ -389,6 +388,23 @@ export function makeToy() {
   g.add(new THREE.Mesh(new THREE.SphereGeometry(0.018, 6, 4).translate(-0.025, 0.07, 0.05), mat('#e0a0a0')));
   g.add(new THREE.Mesh(new THREE.SphereGeometry(0.018, 6, 4).translate(0.025, 0.07, 0.05), mat('#e0a0a0')));
   g.add(new THREE.Mesh(new THREE.CylinderGeometry(0.004, 0.004, 0.14).rotateX(Math.PI / 2).translate(0, 0.02, -0.13), mat('#d05050')));
+  return g;
+}
+
+// Zinc bucket: for putting out the balcony fire. `water` = the water inside (shown when full)
+export function makeBucket() {
+  const g = new THREE.Group();
+  const zinc = mat('#a9b1b8', { metalness: 0.6, roughness: 0.4, side: THREE.DoubleSide });
+  g.add(new THREE.Mesh(new THREE.CylinderGeometry(0.15, 0.11, 0.28, 18, 1, true).translate(0, 0.14, 0), zinc));
+  g.add(new THREE.Mesh(new THREE.CircleGeometry(0.11, 18).rotateX(-Math.PI / 2).translate(0, 0.005, 0), zinc));
+  g.add(new THREE.Mesh(new THREE.TorusGeometry(0.15, 0.008, 6, 20).rotateX(Math.PI / 2).translate(0, 0.28, 0), zinc)); // rim
+  const handle = new THREE.Mesh(new THREE.TorusGeometry(0.15, 0.006, 6, 16, Math.PI), mat('#70757a', { metalness: 0.7 }));
+  handle.position.y = 0.28;
+  g.add(handle);
+  const water = new THREE.Mesh(new THREE.CircleGeometry(0.14, 18).rotateX(-Math.PI / 2).translate(0, 0.22, 0), new THREE.MeshStandardMaterial({ color: '#6fb6e6', roughness: 0.05, transparent: true, opacity: 0.85 }));
+  water.visible = false;
+  g.add(water);
+  g.userData.water = water;
   return g;
 }
 

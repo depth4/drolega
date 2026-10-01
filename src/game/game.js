@@ -3,12 +3,13 @@
 import * as THREE from 'three';
 import { TUNE } from '../config.js';
 import { FURNITURE, TOY_SPOTS, VISITOR_SPOT, CAT_SPOTS, roomAt } from '../world/layout.js';
-import { makePerson, makePuddle, makeToy, makeBottle, makePlate, makeBrokenMark } from '../world/figures.js';
+import { makePerson, makePuddle, makeToy, makeBottle, makePlate, makeBrokenMark, makeBucket } from '../world/figures.js';
 import { Friend, Cat, clamp, rand } from './friends.js';
 import { particles } from '../world/particles.js';
 import { icon } from '../ui/icons.js';
 import { Interactions } from './interact.js';
 import { Cooking } from './cooking.js';
+import { PartyEvents } from './events.js';
 
 export const ITEMS = {
   beer: { name: 'Пиво', icon: '🍺' },
@@ -19,6 +20,8 @@ export const ITEMS = {
   cat: { name: 'Кот', icon: '🐱' },
   tools: { name: 'Инструменты', icon: '🔧' },
   toy: { name: 'Мышка', icon: '🐭' },
+  bucket: { name: 'Ведро', icon: '🪣' },
+  water: { name: 'Ведро воды', icon: '🪣' },
 };
 
 const FRIEND_IDS = ['alexey', 'lyokha', 'kirill', 'temych'];
@@ -51,6 +54,11 @@ class Inventory {
   selectedPortion() {
     return this.portion[this.sel] ?? 1;
   }
+  // the same slot now holds something else (an empty bucket filled up, and back)
+  swap(from, to) {
+    const i = this.slots.indexOf(from);
+    if (i >= 0) this.slots[i] = to;
+  }
   consume() {
     this.slots[this.sel] = null;
     this.portion[this.sel] = 1;
@@ -68,6 +76,7 @@ class Inventory {
     this.slots[this.sel] = null;
     if (item === 'shower') return this.game.hands.returnShower();
     if (item === 'toy') this.game.dropToy();
+    else if (item === 'bucket' || item === 'water') this.game.dropBucket(item === 'water');
     else if (item === 'cat') this.game.dropCat();
     else if (['beer', 'vodka', 'food'].includes(item)) this.game.state.fridge[item] += 1; // back to the fridge
   }
@@ -104,6 +113,40 @@ export class Game {
     this.toyVel = new THREE.Vector3();
     this.toyLoose = false; // thrown / dropped on the floor: the cat goes after it
     this.dynamic.add(this.toy);
+    this.buildBucket();
+    this.events = new PartyEvents(this);
+  }
+
+  // ---------- the bucket (for the balcony fire) ----------
+
+  buildBucket() {
+    const tub = this.furn.items.tub, wc = this.furn.items.toilet;
+    // on the floor in front of the tub, at the end away from the toilet
+    const wcx = (wc.x0 + wc.x1) / 2;
+    const x = Math.abs(tub.x0 - wcx) > Math.abs(tub.x1 - wcx) ? tub.x0 + 0.3 : tub.x1 - 0.3;
+    this.bucketHome = [x, tub.z1 + 0.28];
+    this.bucket = makeBucket();
+    this.bucket.userData.target = { name: 'Ведро', actions: () => [{ key: 'E', text: 'Взять ведро', run: () => this.inv.add('bucket') && (this.bucket.visible = false) }] };
+    this.bucket.traverse((o) => o !== this.bucket && (o.userData.target = this.bucket.userData.target));
+    this.dynamic.add(this.bucket);
+    this.placeBucket(...this.bucketHome);
+  }
+
+  placeBucket(x, z) {
+    this.bucket.position.set(x, 0, z);
+    this.bucket.visible = true;
+  }
+
+  dropBucket(full) {
+    const [x, z] = this.olegPos, yaw = this.olegYaw ?? 0;
+    let px = x - Math.sin(yaw) * 0.5, pz = z - Math.cos(yaw) * 0.5;
+    if (this.toyBlocked(px, pz)) [px, pz] = [x, z];
+    this.placeBucket(px, pz);
+    if (full) {
+      particles.drops(new THREE.Vector3(px, 0.3, pz), new THREE.Vector3(0, 1, 0), { n: 30, color: '#a9dcff', speed: 2, spread: 1, size: 0.02 });
+      this.sfx.splash();
+      this.toast('Вода разлилась', 'info');
+    }
   }
 
   // problem frequency: grows each night, and every night starts calm and ramps up (TUNE.warmup)
@@ -124,10 +167,21 @@ export class Game {
     }
   }
 
+  // this night's setup (TUNE.NIGHTS)
+  get N() {
+    return TUNE.NIGHTS[Math.min(this.night, TUNE.NIGHTS.length) - 1];
+  }
+  get pace() {
+    return this.N.pace;
+  }
+  hasEvent(id) {
+    return this.N.events.includes(id);
+  }
+
   get diff() {
     const W = TUNE.warmup;
     const ramp = Math.min(1, Math.max(0, (this.state.t - W.calm) / W.ramp));
-    return (TUNE.baseDifficulty + (this.night - 1) * TUNE.difficultyPerNight) * (W.min + (1 - W.min) * ramp);
+    return this.N.trouble * (W.min + (1 - W.min) * ramp);
   }
 
   // ---------- night lifecycle ----------
@@ -142,14 +196,14 @@ export class Game {
     this.reactCd = 0;
     this.koch = null;
     this.kochT = null;
-    const S = TUNE.start;
+    const S = TUNE.start, NS = this.N;
     this.state = {
       t: 0,
       totalFun: S.totalFun,
       hut: S.hut,
-      money: S.money,
-      fridge: { ...S.fridge },
-      table: { ...S.table },
+      money: NS.money,
+      fridge: { ...NS.fridge },
+      table: { ...NS.table },
       music: false,
       noise: 0,
       anger: 0,
@@ -159,7 +213,7 @@ export class Game {
       photos: [],
       photoCats: new Set(),
     };
-    this.oleg = { fun: 80, drunk: 0, blackout: 0, energy: TUNE.energy.max, thirst: 20 };
+    this.oleg = { fun: 80, drunk: 0, blackout: 0, energy: TUNE.energy.max, thirst: 0 };
     this.inv = new Inventory(this);
     this.toasts = [];
     this.toastKeys = {};
@@ -172,6 +226,8 @@ export class Game {
     this.stove = { phase: 'idle', t: 0 };
     this.grill = { lit: false, heat: 0 };
     particles.clear();
+    this.events?.reset();
+    this.placeBucket(...this.bucketHome);
     for (const p of this.puddles ?? []) this.dynamic.remove(p);
     this.puddles = [];
     for (const it of Object.values(this.furn.items)) this.setBroken(it, false);
@@ -468,7 +524,10 @@ export class Game {
     const E = TUNE.energy;
     this.oleg.energy = Math.min(E.max, this.oleg.energy + ({ food: E.fromFood, beer: E.fromBeer, vodka: E.fromVodka }[item] ?? 0) * part);
     this.oleg.fun += d.fun * part;
-    if (item === 'beer' || item === 'vodka') this.oleg.thirst = Math.max(0, this.oleg.thirst - TUNE.olegThirst[item]);
+    if (item === 'beer' || item === 'vodka') {
+      this.oleg.thirst = Math.max(0, this.oleg.thirst - TUNE.olegThirst[item]);
+      this.events.olegDrank();
+    }
     this.oleg.drunk = clamp(this.oleg.drunk + d.drunk);
     this.sfx.gulp();
     if (this.oleg.drunk >= TUNE.oleg.blackoutAt) {
@@ -728,7 +787,8 @@ export class Game {
       }],
     });
     T('tub', {
-      info: () => (this.hands.showerHeld() ? 'Лейка у тебя: зажми ЛКМ и поливай' : ''),
+      tub: true,
+      info: () => (this.hands.showerHeld() ? 'Лейка у тебя: зажми ЛКМ и поливай' : this.inv.selectedItem() === 'bucket' ? 'Зажми ЛКМ — набрать воды из лейки' : ''),
       actions: () =>
         this.hands.showerHeld()
           ? [{ key: 'E', text: 'Повесить лейку обратно', run: () => this.hands.returnShower() }]
@@ -907,11 +967,11 @@ export class Game {
 
     // Oleg
     const o = this.oleg;
-    o.fun = clamp(o.fun - TUNE.fun.olegBoredom * dt + (st.music ? 0.2 * dt : 0));
+    o.fun = clamp(o.fun - TUNE.fun.olegBoredom * this.pace * dt + (st.music ? 0.2 * dt : 0));
     o.drunk = clamp(o.drunk - TUNE.oleg.drunkDecay * dt);
     o.energy = Math.min(TUNE.energy.max, o.energy + TUNE.energy.regen * dt);
     const OT = TUNE.olegThirst;
-    o.thirst = Math.min(100, o.thirst + OT.rate * dt);
+    o.thirst = Math.min(100, o.thirst + OT.rate * this.pace * dt);
     if (o.thirst > OT.from) {
       o.fun -= OT.drain * dt * ((o.thirst - OT.from) / (100 - OT.from));
       this.toastOnce('olegThirst', 'Олегу надо выпить: возьми бутылку и нажми Q', 'warn', 25);
@@ -924,6 +984,7 @@ export class Game {
     for (const f of this.friends) f.update(dt);
     particles.update(dt);
     this.updateToy(dt);
+    this.events.update(dt);
     this.cat.update(dt);
     for (const d of Object.values(this.doors)) d.update(dt);
     if (this.entranceCloseT > 0) {

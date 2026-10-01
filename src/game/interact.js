@@ -4,6 +4,7 @@
 //   empty hand on a coughing guy: pat him on the back, click by click, in a steady rhythm
 //   empty hand on a sleeping guy: hold and shake the mouse left-right to shake him awake
 //   the cat's mouse: click to throw it, the cat chases it
+//   bucket: hold LMB at the tub to fill it from the hand shower; with water, click to throw it (fire, people)
 // Everything costs Oleg's strength while he does it. Returns what to show under the crosshair.
 import * as THREE from 'three';
 import { TUNE } from '../config.js';
@@ -18,6 +19,7 @@ export class Interactions {
     this.hose = null;
     this.mixer = null; // world position of the shower mixer
     this.patLast = -9;
+    this.fill = 0; // the bucket filling up under the hand shower
     this.showerHeadMesh = null;
   }
 
@@ -108,6 +110,40 @@ export class Interactions {
     if (held === 'toy' && input.hand && !tgt?.cat) {
       if (input.pressed) g.throwToy(input.hand, input.dir);
       else hud = { label: 'ЛКМ — кинуть мышку коту', progress: null };
+    }
+
+    // ---- the bucket: fill it from the hand shower at the tub, carry it, throw the water
+    if (held === 'bucket') {
+      if (tgt?.tub && this.headParts?.length) {
+        if (input.down) {
+          this.fill += dt / TUNE.events.fillTime;
+          const head = this.headParts[0].getWorldPosition(V);
+          if (input.hand) particles.drops(head, V2.copy(input.hand).sub(head).normalize(), { n: 2, color: '#a9dcff', speed: 3, spread: 0.08, size: 0.012 });
+          if (this.fill >= 1) {
+            this.fill = 0;
+            g.inv.swap('bucket', 'water');
+            g.sfx.splash();
+            g.toast('Ведро полное. Неси и плескай (ЛКМ)', 'info');
+          }
+        }
+        hud = { label: input.down ? 'Набираешь воду…' : 'Зажми ЛКМ — набрать воды из лейки', progress: this.fill };
+      } else hud = g.events.fire ? { label: 'Набери воды: ведро к ванне, ЛКМ', progress: null } : null;
+    } else this.fill = 0;
+    if (held === 'water') {
+      if (input.pressed && input.hand) {
+        particles.drops(input.hand, V.copy(input.dir).add(V2.set(0, 0.25, 0)).normalize(), { n: 70, color: '#a9dcff', speed: 4.2, spread: 0.3, size: 0.026 });
+        g.sfx.splash();
+        g.handAnim = 'use';
+        // where the water lands: the point on the aim line nearest the fire, up to ~3 m out
+        const fire = g.events.fireMesh.position;
+        const t = Math.max(0.5, Math.min(3, V.copy(fire).sub(input.origin).dot(input.dir)));
+        g.events.splash(V.copy(input.origin).addScaledVector(input.dir, t));
+        for (const f of g.friends) {
+          const to = V2.set(f.pos[0], 1.3, f.pos[1]).sub(input.origin);
+          if (to.length() < 2.4 && to.normalize().dot(input.dir) > Math.cos(0.35)) f.soak(4);
+        }
+        g.inv.swap('water', 'bucket');
+      } else hud = { label: g.events.fire ? 'ЛКМ — плеснуть на огонь' : 'ЛКМ — плеснуть водой', progress: null };
     }
 
     // ---- scrubbing a puddle with the rag

@@ -428,6 +428,10 @@ function frame(now) {
     const held = game.inv.selectedItem();
     use.busy = (held === 'mop' && target?.puddle) || (!held && target?.friend?.problem?.id === 'sleep');
     hands.setActivity({ spray: held === 'shower' && use.down, scrub: use.down && held === 'mop' && target?.puddle ? 1 : 0, shake: use.down && !held && target?.friend?.problem?.id === 'sleep' ? 1 : 0, mx: use.mx, my: use.my });
+    if (game.handAnim) {
+      hands.play(game.handAnim);
+      game.handAnim = null;
+    }
     use.pressed = false;
     use.mx = use.my = 0;
     if (!focusActive()) hud.setUse(handHud);
