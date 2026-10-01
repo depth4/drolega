@@ -8,6 +8,7 @@ import { H, planToWorld as P, worldToPlan } from './layout.js';
 import { mat, boxGeo, worldUV } from './apartment.js';
 import * as T from './textures.js';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
+import { Batch, GLASS, cigarettes, pelmeniPack, chipsBag, signText } from './goods.js';
 
 // Khrushchevka stairwell, Oleg on the 2nd floor. Out of his door onto the landing, then towards the
 // front of the house: a flight down to the half landing, a flight back to the 1st-floor landing (right
@@ -205,48 +206,99 @@ export function buildOutside() {
   pbox(group, S.x0 + 0.55, S.x1 - 0.55, STREET + 1.0, STREET + 1.05, S.z0 + 0.95, S.z0 + 1.45, mat('#c9b48a'));
   wall(S.x0 + 0.6, S.x1 - 0.6, S.z0 + 1.0, S.z0 + 1.4);
   const shelves = [];
-  const shelf = (id, x0, x1, z0, z1, color, label) => {
-    const unit = pbox(group, x0, x1, STREET, STREET + 1.9, z0, z1, mat('#6b6156'));
+  const MATS = {
+    clear: GLASS.clear(), brown: GLASS.brown(), green: GLASS.green(), amber: GLASS.amber(),
+    paper: mat('#ece6d6', { roughness: 0.9 }), gold: mat('#c9a23a', { roughness: 0.6 }), red: mat('#a8202a', { roughness: 0.7 }), blue: mat('#2a4a8a', { roughness: 0.7 }),
+    pelmeni: new THREE.MeshStandardMaterial({ map: pelmeniPack(), roughness: 0.6 }),
+    chips: new THREE.MeshStandardMaterial({ map: chipsBag(), roughness: 0.45 }),
+  };
+  const addBatch = (parent, batch) => {
+    for (const [key, geos] of batch.parts) parent.add(new THREE.Mesh(mergeGeometries(geos), MATS[key]));
+  };
+  const rack = mat('#5a524a', { roughness: 0.8 });
+  // open shelving against a side wall: back panel, ends, four boards, the goods standing on them
+  const shelf = (id, x0, x1, z0, z1, label) => {
+    const unit = new THREE.Group();
+    const wallSide = x0 < cx ? 'lo' : 'hi'; // which plan-x end is against the shop wall
+    const [bx0, bx1] = wallSide === 'lo' ? [x0, x0 + 0.03] : [x1 - 0.03, x1];
+    pbox(unit, bx0, bx1, STREET, STREET + 1.9, z0, z1, rack);
+    pbox(unit, x0, x1, STREET, STREET + 1.9, z0, z0 + 0.03, rack);
+    pbox(unit, x0, x1, STREET, STREET + 1.9, z1 - 0.03, z1, rack);
+    const boards = [0.06, 0.48, 0.9, 1.32];
+    for (const y of boards) pbox(unit, x0, x1, STREET + y - 0.03, STREET + y, z0, z1, rack);
+    pbox(unit, x0, x1, STREET + 1.87, STREET + 1.9, z0, z1, rack);
     wall(x0, x1, z0, z1);
     const goods = new THREE.Group();
-    const r = P.rect(x0, x1, z0, z1);
-    const alongX = r.x1 - r.x0 > r.z1 - r.z0;
-    const len = alongX ? r.x1 - r.x0 : r.z1 - r.z0, dep = alongX ? r.z1 - r.z0 : r.x1 - r.x0;
-    const boxes = [];
-    for (let row = 0; row < 4; row++)
-      for (let k = 0; k < 6; k++) {
-        const w = len / 6;
-        const along = (alongX ? r.x0 : r.z0) + w * (k + 0.5);
-        const g = alongX ? new THREE.BoxGeometry(w * 0.7, 0.22, dep * 0.6) : new THREE.BoxGeometry(dep * 0.6, 0.22, w * 0.7);
-        boxes.push(g.translate(alongX ? along : (r.x0 + r.x1) / 2, STREET + 0.35 + row * 0.42, alongX ? (r.z0 + r.z1) / 2 : along));
+    const batch = new Batch();
+    const a = P.pt((x0 + x1) / 2, z0 + 0.06), b = P.pt((x0 + x1) / 2, z1 - 0.06);
+    const depth = P.len(x1 - x0);
+    boards.forEach((by, row) => {
+      const y = STREET + by;
+      if (id === 'beer' || id === 'vodka') {
+        const kind = id === 'beer' ? 'beer' : row === 3 ? 'cognac' : 'vodka';
+        const n = Math.floor(Math.hypot(b[0] - a[0], b[1] - a[1]) / (kind === 'cognac' ? 0.11 : 0.085));
+        for (let k = 0; k <= n; k++) {
+          for (const d of [-0.22, 0.12]) { // two deep
+            const t = k / n, x = a[0] + (b[0] - a[0]) * t + d * depth * (wallSide === 'lo' ? -1 : 1) * 0.5, z = a[1] + (b[1] - a[1]) * t;
+            if (kind === 'beer') batch.bottle('beer', (k + row) % 3 ? 'brown' : 'green', (k + row) % 3 ? 'gold' : 'red', x, y, z);
+            else batch.bottle(kind, kind === 'cognac' ? 'amber' : 'clear', kind === 'cognac' ? 'gold' : 'paper', x, y, z);
+          }
+        }
+      } else {
+        const bag = id === 'chips';
+        const n = Math.floor(Math.hypot(b[0] - a[0], b[1] - a[1]) / 0.19);
+        for (let k = 0; k <= n; k++) {
+          const t = k / n, x = a[0] + (b[0] - a[0]) * t, z = a[1] + (b[1] - a[1]) * t;
+          const h = bag ? 0.26 : 0.22;
+          // the wide printed side faces the aisle (along the shelf = world z)
+          const g = new THREE.BoxGeometry(bag ? 0.07 : 0.05, h, 0.16).translate(x, y + h / 2, z);
+          batch.put(bag ? 'chips' : 'pelmeni', g);
+        }
       }
-    goods.add(new THREE.Mesh(mergeGeometries(boxes), mat(color))); // one draw call per shelf
-    group.add(goods);
+    });
+    addBatch(goods, batch);
+    unit.add(goods);
+    group.add(unit);
     shelves.push({ id, label, mesh: unit, goods });
   };
   const zm = S.z0 + 2.65; // shelves along the side walls, by the door half
-  shelf('beer', S.x0 + 0.15, S.x0 + 0.55, zm - 0.85, zm, '#3c6e2d', 'Пиво');
-  shelf('vodka', S.x0 + 0.15, S.x0 + 0.55, zm, zm + 0.85, '#dfe9ee', 'Водка');
-  shelf('pelmeni', S.x1 - 0.55, S.x1 - 0.15, zm - 0.85, zm, '#e8eef8', 'Пельмени');
-  shelf('chips', S.x1 - 0.55, S.x1 - 0.15, zm, zm + 0.85, '#e0a21b', 'Сухарики');
-  // behind the cashier: the wall of cigarettes, bottles and everything
-  pbox(group, S.x0 + 0.3, S.x1 - 0.3, STREET, STREET + 2.2, S.z0 + 0.15, S.z0 + 0.55, mat('#5e544a'));
-  const backGoods = ['#b3242a', '#e8e0c8', '#2f5fb8', '#3c6e2d', '#e0a21b', '#7a3a8a', '#dfe9ee'];
-  const byColor = new Map(); // merged per colour and kind: a dozen draw calls instead of 65
-  for (let row = 0; row < 5; row++) {
-    for (let k = 0; k < 13; k++) {
-      const x = S.x0 + 0.45 + k * 0.28, bottle = row < 2;
-      const [bx, bz] = P.pt(x, S.z0 + 0.58);
-      const color = backGoods[(bottle ? k + row * 3 : k * 2 + row) % backGoods.length];
-      const g = bottle ? new THREE.CylinderGeometry(0.035, 0.04, 0.3, 8) : new THREE.BoxGeometry(0.2, 0.12, 0.06);
-      g.translate(bx, STREET + 0.45 + row * 0.38 + (bottle ? 0.15 : 0.06), bz);
-      const key = `${color}${bottle ? 'b' : ''}`;
-      if (!byColor.has(key)) byColor.set(key, []);
-      byColor.get(key).push(g);
-    }
+  shelf('beer', S.x0 + 0.15, S.x0 + 0.55, zm - 0.85, zm, 'Пиво');
+  shelf('vodka', S.x0 + 0.15, S.x0 + 0.55, zm, zm + 0.85, 'Водка');
+  shelf('pelmeni', S.x1 - 0.55, S.x1 - 0.15, zm - 0.85, zm, 'Пельмени');
+  shelf('chips', S.x1 - 0.55, S.x1 - 0.15, zm, zm + 0.85, 'Сухарики');
+  // behind the cashier: bottles on the two lower boards, the cigarette wall above, an "18+" sign on top
+  pbox(group, S.x0 + 0.3, S.x1 - 0.3, STREET, STREET + 2.2, S.z0 + 0.15, S.z0 + 0.55, mat('#3a332d'));
+  const back = new Batch();
+  const fz = S.z0 + 0.62; // bottle row line, on the boards
+  for (let row = 0; row < 2; row++) {
     pbox(group, S.x0 + 0.3, S.x1 - 0.3, STREET + 0.4 + row * 0.38, STREET + 0.43 + row * 0.38, S.z0 + 0.15, S.z0 + 0.7, mat('#4a4038'));
+    const y = STREET + 0.43 + row * 0.38;
+    for (let x = S.x0 + 0.42; x < S.x1 - 0.38; x += row ? 0.09 : 0.075) {
+      const [wx, wz] = P.pt(x, fz);
+      const i = Math.round(x * 100);
+      if (row === 0) back.bottle('beer', i % 3 ? 'brown' : 'green', i % 4 ? 'gold' : 'blue', wx, y, wz);
+      else if (i % 5 === 0) back.bottle('cognac', 'amber', 'gold', wx, y, wz);
+      else back.bottle('vodka', 'clear', i % 3 ? 'paper' : 'red', wx, y, wz);
+    }
   }
-  for (const [key, geos] of byColor) group.add(new THREE.Mesh(mergeGeometries(geos), mat(key.slice(0, 7), key.endsWith('b') ? { roughness: 0.2 } : {})));
+  addBatch(group, back);
+  // cigarettes: three printed rows on the upper part of the unit, each on its own little board
+  const cw = P.len(S.x1 - 0.6 - (S.x0 + 0.6));
+  for (let row = 0; row < 3; row++) {
+    const y = STREET + 1.22 + row * 0.32;
+    pbox(group, S.x0 + 0.3, S.x1 - 0.3, y - 0.03, y, S.z0 + 0.15, S.z0 + 0.62, mat('#4a4038'));
+    const t = cigarettes(row);
+    t.wrapS = THREE.RepeatWrapping;
+    t.repeat.x = cw / 1.28; // a pack is ~5.5 cm wide: 22 px of the 512 px strip
+    const plane = new THREE.Mesh(new THREE.PlaneGeometry(cw, 0.28), new THREE.MeshStandardMaterial({ map: t, roughness: 0.7 }));
+    const [px, pz] = P.pt(cx, S.z0 + 0.56);
+    plane.position.set(px, y + 0.14, pz);
+    group.add(plane);
+  }
+  const sign18 = new THREE.Mesh(new THREE.PlaneGeometry(P.len(2.2), 0.22), new THREE.MeshBasicMaterial({ map: signText('ТАБАК · АЛКОГОЛЬ · 18+'), toneMapped: false }));
+  const [s18x, s18z] = P.pt(cx, S.z0 + 0.56);
+  sign18.position.set(s18x, STREET + 2.3, s18z);
+  group.add(sign18);
   const shopDoor = { ...P.rect(S.door[0], S.door[1], S.z1 - 0.2, S.z1 + 0.05), enabled: false };
   colliders.push(shopDoor);
   const cashier = P.pt(cx, S.z0 + 0.75);
