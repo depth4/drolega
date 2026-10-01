@@ -74,7 +74,6 @@ export class Shop {
     g.state.stats.spent += sum;
     this.unpaid = [];
     g.sfx.ding();
-    g.toast(`Оплатил ${sum} ₽`, 'good');
   }
 
   update(dt, olegPos) {

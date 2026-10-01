@@ -2,6 +2,7 @@
 import { TUNE } from '../config.js';
 import { SPOTS, CAT_SPOTS, roomAt } from '../world/layout.js';
 import { makePerson, makeCat } from '../world/figures.js';
+import { Ragdoll } from '../world/ragdoll.js';
 import { route } from './nav.js';
 import { NAV } from '../world/layout.js';
 
@@ -148,7 +149,6 @@ export const CHARS = {
       const L = TUNE.lyokha;
       if (!f.wasted && !f.warned && f.drunk >= L.wastedAt - L.warnBefore) {
         f.warned = true;
-        g.toast('Лёха зеленеет — накорми его (еда в руках, E на нём), пока не поплыл', 'warn', f.room?.name);
       }
       if (f.warned && f.drunk < L.wastedAt - L.warnBefore - 10) f.warned = false;
       if (!f.problem && !f.wasted && f.mode !== 'walk' && f.drunk >= L.wastedAt) startWasted(f, g);
@@ -199,7 +199,6 @@ const PROBLEMS = {
           if (tb.vodka > 0) tb.vodka -= 1;
           else if (tb.beer > 0) tb.beer -= 1;
           if (!g.tableBooze()) {
-            g.toast('Алексей выжрал всё со стола', 'bad');
             f.clearProblem(false);
           }
         }
@@ -209,7 +208,7 @@ const PROBLEMS = {
         run() {
           f.fun -= 5;
           f.clearProblem(true);
-          if (g.inv.add('beer')) g.toast('Бутылка теперь у тебя', 'info');
+          g.inv.add('beer');
         },
       }],
     };
@@ -328,7 +327,6 @@ const PROBLEMS = {
           g.state.hut -= TUNE.hut.peed;
           f.fun -= 10;
           f.bladder = 0;
-          g.toast(`${f.name} не дотерпел. Лужа в прихожей`, 'bad');
           f.clearProblem(false);
         }
       },
@@ -363,6 +361,7 @@ export class Friend extends Walker {
   constructor(game, id) {
     const def = CHARS[id];
     super(game, makePerson({ ...def, style: game.style, faceId: id }), 1.8, true);
+    this.rag = new Ragdoll(this.figure.rig); // the physical body (world/ragdoll.js)
     this.id = id;
     this.def = def;
     this.name = def.name;
@@ -470,6 +469,7 @@ export class Friend extends Walker {
   animLoop() {
     if (this.debugLoop !== undefined) return this.debugLoop; // console testing: f.debugLoop = 'puke'
     if (this.fallen) return this.fallen.t > 0.45 && !this.fallen.up ? 'fallen' : null;
+    if (this.activity?.id === 'pc' && this.figure.pose === 'sit' && this.mode !== 'walk') return 'typing';
     if (this.wetT > 0 && this.figure.pose !== 'lie') return 'shiver';
     const pid = this.problem?.id;
     if (this.mode === 'walk' || this.follow) return pid === 'smash' ? 'smashWalk' : pid === 'puke' || pid === 'led' ? 'holdMouth' : null;
@@ -501,7 +501,7 @@ export class Friend extends Walker {
     this.figure.setFace?.(this.faceState());
     this.figure.setTint?.((this.warned && !this.wasted) || this.problem?.id === 'puke' ? '#a8f0a0' : '#ffffff');
     // small random gestures so nobody stands like a statue
-    if (!this.problem && this.mode !== 'walk' && this.figure.pose !== 'lie' && (!loop || loop === 'dance' || loop === 'seatDance') && !this.figure.busy) {
+    if (!this.problem && this.mode !== 'walk' && this.figure.pose !== 'lie' && (!loop || loop === 'dance' || loop === 'seatDance') && !this.figure.busy && this.activity?.id !== 'pc') {
       this.ambientT = (this.ambientT ?? rand(2, 6)) - dt;
       if (this.ambientT <= 0) {
         this.ambientT = rand(3.5, 8);
@@ -520,9 +520,36 @@ export class Friend extends Walker {
     const jig = this.shake * Math.sin(this.t * 45) * 0.06; // being shaken awake
     this.applyTransform(Math.cos(this.heading) * (lat + jig), -Math.sin(this.heading) * (lat + jig), walk ? 0.35 * d * Math.sin(this.t * 2.1 + this.seed) : 0);
     const talking = this.game.talk?.friend === this; // stands still while telling his story
-    this.balanceTick(dt);
-    const b = this.bal;
-    this.figure.update(dt, { walking: walk && !(this.lurch > 0) && !talking, speed: this.speed, drunk: d, music: this.game.state.music, bal: b && { p: b.p, r: b.r, m: Math.hypot(b.p, b.r) } });
+    // on his feet he's a physical ragdoll; sitting / lying / carried the animation drives him alone
+    const rag = this.rag;
+    const phys = rag && !this.game.noPhysics && this.figure.pose === 'stand' && this.figure.root.visible && !(this.fallen && !this.fallen.phys);
+    if (phys && !rag.active) rag.enable(this.pos[0], this.pos[1], this.heading);
+    else if (!phys && rag?.active) rag.disable();
+    if (rag?.active) rag.restore();
+    else this.balanceTick(dt);
+    const b = rag?.active ? null : this.bal;
+    this.figure.update(dt, { walking: walk && !(this.lurch > 0) && !talking, speed: this.speed, drunk: d, music: this.game.state.music, bal: b && { p: b.p, r: b.r, m: Math.hypot(b.p, b.r) }, physical: !!rag?.active });
+    if (rag?.active) rag.capture(this.heading);
+  }
+
+  // after the physics step: the body on the floor? he fell. Lying long enough: he struggles back up
+  physicsTick(dt) {
+    const rag = this.rag;
+    if (!rag?.active) return;
+    const F = this.fallen;
+    if (!F && rag.upright < 0.45) {
+      this.fallen = { phys: true, t: 0, lie: rand(1.0, 2.0) + (this.drunk / 100) * 2.5, why: rag.lastPush ?? 'drunk' };
+      rag.limp = 1;
+      this.figure.play('flail');
+      this.fun = clamp(this.fun - 3);
+      this.game.someoneFell(this, this.fallen.why);
+    }
+    // pulled too far from where he should be (stuck on furniture): put him back on his feet there
+    const [px, pz] = [rag.pelvis.x, rag.pelvis.z];
+    if (!this.fallen && Math.hypot(px - this.pos[0], pz - this.pos[1]) > 1.6) {
+      rag.disable();
+      rag.enable(this.pos[0], this.pos[1], this.heading);
+    }
   }
 
   get statusText() {
@@ -536,7 +563,6 @@ export class Friend extends Walker {
     this.problem = p;
     p.since = 0;
     this.figure.setStatus(p.short);
-    if (p.drain > 0) this.game.alert(`${this.name} ${p.text}`, this.room?.name);
   }
 
   clearProblem(helped) {
@@ -583,7 +609,6 @@ export class Friend extends Walker {
       const door = this.activity.spot.id === 'balcony' ? g.doors.balcony : g.doors.bath;
       if (door.open) {
         door.setOpen(false);
-        g.toast(`${this.name} заперся ${door.id === 'balcony' ? 'на балконе' : 'в санузле'} с вейпом`, 'warn', this.room?.name);
       }
     }
   }
@@ -716,6 +741,11 @@ export class Friend extends Walker {
 
   // a kick to his balance: dir = where it pushes him (world), strength in rad/s
   push(dir, strength, why = 'shove') {
+    if (this.rag?.active) {
+      this.rag.push(dir, strength * 0.5);
+      this.rag.lastPush = why;
+      return;
+    }
     const b = (this.bal ??= { p: 0, r: 0, vp: 0, vr: 0 });
     const rel = dir - this.heading;
     b.vp += Math.cos(rel) * strength;
@@ -727,6 +757,13 @@ export class Friend extends Walker {
   fall(dir = this.heading, why = 'drunk') {
     if (this.fallen || this.figure.pose !== 'stand' || this.follow) return false;
     const g = this.game;
+    if (this.rag?.active) {
+      // a real fall: knock the body over and go limp; physicsTick sees him on the floor
+      this.rag.push(dir, 3.5);
+      this.rag.limp = 1;
+      this.rag.lastPush = why;
+      return true;
+    }
     this.fallen = { t: 0, rel: dir - this.heading, lie: rand(1.2, 2.2) + (this.drunk / 100) * 2.5, why };
     this.figure.play('flail');
     this.fun = clamp(this.fun - 3);
@@ -737,6 +774,31 @@ export class Friend extends Walker {
   fallTick(dt) {
     const F = this.fallen;
     F.t += dt;
+    if (F.phys) {
+      // the ragdoll lies there, then gets up like a robot learning to stand
+      const rag = this.rag;
+      if (F.t > F.lie && !F.up) {
+        F.up = true;
+        rag.limp = 0;
+        rag.assist = 1.4;
+        this.figure.play('getup');
+      }
+      if (F.up && (rag.upright > 0.9 || F.t > F.lie + 4)) {
+        if (rag.upright <= 0.9) {
+          rag.disable(); // gave up struggling: back on his feet
+          rag.enable(rag.pelvis.x, rag.pelvis.z, this.heading);
+        }
+        rag.assist = 0.8;
+        rag.grace = 2; // finds his feet: the help fades out
+        this.pos = [rag.pelvis.x, rag.pelvis.z];
+        this.fallen = null;
+      }
+      if (!rag.active) {
+        rag.assist = 0;
+        this.fallen = null;
+      }
+      return;
+    }
     const down = 0.45, up = 0.7;
     let k;
     if (F.t < down) k = (F.t / down) ** 2; // gravity
@@ -883,7 +945,6 @@ export class Friend extends Walker {
         if (a.cook >= G.shashlikEvery) {
           a.cook = 0;
           g.state.table.food += G.shashlikPlates;
-          g.toast(`Шашлык готов! +${G.shashlikPlates} на стол`, 'good');
         }
         if (this.problem?.id === 'grillOut') this.clearProblem(false);
       } else if (!this.problem) this.setProblem(PROBLEMS.grillOut(this, g));
@@ -893,7 +954,6 @@ export class Friend extends Walker {
       } else a.closedT = 0;
       if (g.doors.balcony.open && chance(G.draftChance * g.diff, dt)) {
         g.doors.balcony.setOpen(false);
-        g.alert('Сквозняк захлопнул балконную дверь', 'Балкон');
       }
     }
 
@@ -929,7 +989,7 @@ export class Friend extends Walker {
         list.push({
           key: 'E', text: `Дать ${item === 'beer' ? 'пиво' : 'водку'}`,
           run: () => {
-            if (!this.def.drinker) return g.toast(`${this.name} не пьёт`, 'info');
+            if (!this.def.drinker) return;
             g.inv.consume();
             this.drink(TUNE.give[item], TUNE.give[item].buzzTime, item);
             this.thirst = Math.max(0, this.thirst - TUNE.needs.give);
@@ -1007,7 +1067,6 @@ export class Cat extends Walker {
     if (this.problem?.id === id) return;
     this.problem = { id, text, short, drain };
     this.figure.setStatus(short);
-    this.game.alert(`Кот ${text}`, this.room?.name);
   }
 
   clearProblem(helped) {
@@ -1197,7 +1256,6 @@ export class Cat extends Walker {
     this.spot = { id: 'floor', node: this.node, p: [...this.pos], pose: null };
     if (hid && g.toyLoose) {
       g.respawnToy();
-      g.toast('Кот закатил мышку под мебель', 'info');
     }
   }
 

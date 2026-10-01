@@ -1,7 +1,7 @@
 // Builds the flat's shell from layout.js: floors, walls with openings, wallpaper linings,
 // windows, interactive doors, balcony, ceiling, lamps and the night view outside.
 import * as THREE from 'three';
-import { H, ROOMS, WALLS, DIAG_WALLS, BALCONY, CENTER, BOUNDS, roomAt } from './layout.js';
+import { H, ROOMS, WALLS, DIAG_WALLS, BALCONY, CENTER, BOUNDS, CAT_SPOTS, roomAt } from './layout.js';
 import * as T from './textures.js';
 
 
@@ -143,7 +143,14 @@ export function buildApartment() {
       }
       P(a0, a1, b.railH, b.railH + f, c0, c1, frame);
       P(a0, a1, top - f, top, c0, c1, frame);
-      P(a0, a1, b.railH + f, top - f, (c0 + c1) / 2 - 0.005, (c0 + c1) / 2 + 0.005, glass);
+      // glass pane by pane; the front pane by the cat's windowsill is the opening sash (living.js), no glass behind it
+      const front = alongX && s === sides[0];
+      const sashK = front ? Math.max(0, Math.min(n - 1, Math.floor((CAT_SPOTS.catRail.p[0] - a0) / ((a1 - a0) / n)))) : -1;
+      for (let i = 0; i < n; i++) {
+        if (i === sashK) continue;
+        const u0 = a0 + ((a1 - a0) * i) / n, u1 = a0 + ((a1 - a0) * (i + 1)) / n;
+        P(u0, u1, b.railH + f, top - f, (c0 + c1) / 2 - 0.005, (c0 + c1) / 2 + 0.005, glass);
+      }
     }
     ceiling.add(new THREE.Mesh(boxGeo(b.x0 - 0.05, b.x1 + 0.05, top, top + 0.12, b.z0 - 0.05, b.z1), mat('#8a857c')));
   }

@@ -133,7 +133,6 @@ export class PC {
       id: 'gamble', text: 'крутит апгрейдер на твои деньги — оттащи его от компа', short: 'ЛУДИТ', drain: -0.6,
       actions: () => [{ key: 'E', text: 'Оттащить от компа', cost: TUNE.cost.lead, run: () => this.kick() }],
     });
-    this.game.toast(`${f.name} сел за комп крутить апгрейдер на твои деньги!`, 'warn', 'Спальня');
   }
 
   standFriend(f) {
@@ -172,7 +171,6 @@ export class PC {
     this.sel = this.skins.length - 1;
     this.fixGoal();
     g.sfx.click();
-    if (by) g.toastOnce(`pcBuy${by.id}`, `${by.name} купил скин за ${s.price} ₽ с твоих денег`, 'warn', 8);
     return true;
   }
 
@@ -184,7 +182,6 @@ export class PC {
     this.skins.splice(this.sel, 1);
     this.sel = Math.max(0, Math.min(this.sel, this.skins.length - 1));
     g.sfx.ding();
-    g.toast(`Продал ${SKINS[i].name} за ${got} ₽`, 'good');
   }
 
   // the target has to be pricier than what you put in
@@ -228,7 +225,6 @@ export class PC {
         f.figure.play('shout');
       }
       if (!s.by) g.oleg.fun = clamp(g.oleg.fun + P.winFun);
-      g.toast(`${s.by ? s.by.name : 'Олег'} выбил ${goal.name}!`, 'good');
     } else {
       for (const f of watchers) {
         f.fun = clamp(f.fun + (f === s.by ? -2 : P.loseFun));

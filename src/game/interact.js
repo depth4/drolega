@@ -123,7 +123,6 @@ export class Interactions {
             this.fill = 0;
             g.inv.swap('bucket', 'water');
             g.sfx.splash();
-            g.toast('Ведро полное. Неси и плескай (ЛКМ)', 'info');
           }
         }
         hud = { label: input.down ? 'Набираешь воду…' : 'Зажми ЛКМ — набрать воды из лейки', progress: this.fill };

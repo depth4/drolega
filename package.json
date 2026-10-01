@@ -10,6 +10,7 @@
     "plan": "node scripts/plan.mjs"
   },
   "dependencies": {
+    "cannon-es": "^0.20.0",
     "three": "^0.186.1"
   },
   "devDependencies": {

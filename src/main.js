@@ -4,6 +4,7 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { buildApartment } from './world/apartment.js';
 import { buildFurniture } from './world/furniture.js';
 import { buildOutside } from './world/outside.js';
+import * as ragdoll from './world/ragdoll.js';
 import { roomAt, START, DOORCAM, SPOTS, CENTER } from './world/layout.js';
 import { Game } from './game/game.js';
 import { Player } from './player.js';
@@ -47,6 +48,8 @@ scene.add(outside.group);
 apt.ceiling.add(outside.ceiling);
 const player = new Player(camera, [...apt.colliders, ...furn.colliders, ...outside.colliders]);
 player.floorAt = outside.heightAt;
+ragdoll.addStatics(apt.colliders, 2.6); // walls for the ragdolls
+ragdoll.addStatics(furn.colliders, 0.8); // furniture (they bump into it, fall over it)
 scene.add(camera); // the first-person hands hang off the camera
 const hands = createViewmodel(camera);
 let mirror = null; // created at boot, once the head style is known
@@ -71,6 +74,8 @@ window.__player = player;
 window.__spots = SPOTS;
 window.__three = THREE; // debugging: raycasts from the console
 window.__tune = TUNE; // balance numbers, live
+window.__ragdoll = ragdoll; // physics debugging
+if (params.get('physics') === 'off') game.noPhysics = true; // debug: the old kinematic bodies
 
 const orbit = new OrbitControls(orbitCam, canvas);
 orbit.target.set(CENTER.x, 0, CENTER.z);

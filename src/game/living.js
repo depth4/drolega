@@ -241,7 +241,6 @@ export class Living {
 
   setWindow(open, by) {
     this.windowOpen = open;
-    if (open && by) this.game.toast(`${by.name} открыл створку на балконе — кот может выпасть`, 'warn', 'Балкон');
   }
 
   // ---------- frame ----------
@@ -293,11 +292,9 @@ export class Living {
     if (pick === 'musicOn') {
       st.music = true;
       say('Чё так тихо? Врубаю музон!');
-      g.toast(`${f.name} врубил музыку`, 'warn', 'Зал');
     } else if (pick === 'musicUp') {
       st.volume += 1;
       say(st.volume === 3 ? 'НА МАКСИМУМ!' : 'Погромче сделаю');
-      g.toast(`${f.name} выкрутил музыку погромче (${st.volume}/3)`, 'warn', 'Зал');
     } else if (pick === 'tvOn') {
       this.setTV(true);
       this.switchCh(Math.floor(Math.random() * CHANNELS.length));
@@ -315,7 +312,6 @@ export class Living {
     } else if (pick === 'tvUp') {
       this.tv.vol += 1;
       say('Не слышно же ничё!');
-      g.toast(`${f.name} сделал телик громче (${this.tv.vol}/3)`, 'warn', 'Зал');
     } else if (pick === 'window') {
       this.setWindow(true, f);
       say('Душно, открою');

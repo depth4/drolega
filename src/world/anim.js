@@ -161,6 +161,14 @@ function base(p, c) {
 }
 
 const LOOPS = {
+  // at the PC: hands forward on the keyboard and the mouse, tapping away
+  typing(p, c) {
+    for (const [i, s] of SIDES.entries()) {
+      Object.assign(p.arms[i], { x: -1.05 + 0.04 * Math.sin(c.T * (i ? 23 : 17)), z: s * 0.18, elbow: -0.85 + 0.06 * Math.sin(c.T * (i ? 19 : 29)) });
+    }
+    p.spine.x = 0.12;
+    p.neck.x = 0.05;
+  },
   // on the floor after falling over: arms and legs all over the place, twitching
   fallen(p, c) {
     for (const [i, s] of SIDES.entries()) {
@@ -669,7 +677,8 @@ export function createRig(body, { m, sk, style }) {
     get busy() {
       return !!shot;
     },
-    update(dt, { walking = false, speed = 1.8, drunk = 0, music = false, bal = null } = {}) {
+    // physical: a ragdoll plays this body (world/ragdoll.js); then no fake inertia / shoves here, physics does that
+    update(dt, { walking = false, speed = 1.8, drunk = 0, music = false, bal = null, physical = false } = {}) {
       T += dt;
       ctx.dt = dt;
       if (walking) walkPhase += dt * speed * ((2 * Math.PI) / 1.35);
@@ -712,9 +721,9 @@ export function createRig(body, { m, sk, style }) {
         phys.fwd = fwd;
         phys.side = side;
       }
-      const lean = (amt) => -(phys.fwd ?? 0) * amt * sdt; // speeding up throws the top back, braking throws it forward
-      const roll = (amt) => (phys.side ?? 0) * amt * sdt;
-      const shove = 4 * d * d; // random drunk shoves (rad/s per frame)
+      const lean = (amt) => (physical ? 0 : -(phys.fwd ?? 0) * amt * sdt); // speeding up throws the top back, braking throws it forward
+      const roll = (amt) => (physical ? 0 : (phys.side ?? 0) * amt * sdt);
+      const shove = physical ? 0 : 4 * d * d; // random drunk shoves (rad/s per frame)
       pelvis.position.x += (p.body.x - pelvis.position.x) * Math.min(1, dt * 9);
       pelvis.position.z += (p.body.z - pelvis.position.z) * Math.min(1, dt * 9);
       spring(pelvis.position, 'y', DIM.hip + p.body.y, sdt, 1.2);
@@ -757,6 +766,7 @@ export function createRig(body, { m, sk, style }) {
         arm.shoulder.quaternion.slerp(fkQ, k);
         // the arm swings on its own: inertia from the body, drunk flailing; less so when it holds something
         arm.swing ??= { x: 0, z: 0 };
+        if (physical) arm.swing.x = arm.swing.z = 0;
         const free = 1 - arm.ikW;
         spring(arm.swing, 'x', 0, sdt, 0.5, free * (lean(0.12) + noise(shove * 0.9)));
         spring(arm.swing, 'z', 0, sdt, 0.5, free * (roll(0.12) * SIDES[i] + noise(shove * 0.8)));

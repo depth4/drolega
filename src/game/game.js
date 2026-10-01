@@ -13,6 +13,7 @@ import { PartyEvents } from './events.js';
 import { PC } from './pc.js';
 import { Living } from './living.js';
 import { Shop } from './shop.js';
+import { step as physicsStep, moveOleg, updateDoors, Ragdoll } from '../world/ragdoll.js';
 
 export const ITEMS = {
   beer: { name: 'Пиво', icon: '🍺' },
@@ -83,8 +84,8 @@ class Inventory {
     if (item === 'shower') return this.game.hands.returnShower();
     // outside the flat there's no fridge to put it back in: in the shop it goes back on the shelf
     if (this.game.outside && roomAt(...this.game.olegPos) == null) {
-      if (this.game.shop?.putBack(item)) return this.game.toast('Положил обратно на полку', 'info');
-      if (['beer', 'vodka', 'food', 'pelmeni'].includes(item)) return this.game.toast('Выкинул', 'warn');
+      if (this.game.shop?.putBack(item)) return;
+      if (['beer', 'vodka', 'food', 'pelmeni'].includes(item)) return;
     }
     if (item === 'pelmeni') return void this.game.state.fridge.pelmeni++;
     if (item === 'toy') this.game.dropToy();
@@ -235,7 +236,7 @@ export class Game {
   // knocks him over; two drunks walking into each other may go down
   bumps() {
     const C = TUNE.chaos, t = this.state.t, R2 = C.radius * 2;
-    const ppl = this.friends.filter((f) => !f.fallen && f.figure.pose === 'stand' && !f.follow && f.figure.root.visible);
+    const ppl = this.friends.filter((f) => !f.fallen && f.figure.pose === 'stand' && !f.follow && f.figure.root.visible && !f.rag?.active);
     for (const key in this.stuck ?? {}) this.stuck[key] = Math.max(0, this.stuck[key] - 1 / 120);
     for (let i = 0; i < ppl.length; i++) {
       for (let j = i + 1; j < ppl.length; j++) {
@@ -275,6 +276,16 @@ export class Game {
     // Oleg walks into people: they get pushed; at a run a drunk one goes flying
     const [ox, oz] = this.olegPos, sp = this.olegSpeed ?? 0, RO = C.radius + 0.17;
     if (this.oleg.fall) return;
+    // ragdolls: running into one is a hit to his upper body; the physics decides if he stays up
+    for (const f of this.friends) {
+      if (!f.rag?.active || f.fallen || sp < 0.8 || (f.shoveCd ?? 0) > t) continue;
+      const P = f.rag.pelvis, dx = P.x - ox, dz = P.z - oz, d = Math.hypot(dx, dz);
+      if (d > 0.5) continue;
+      f.shoveCd = t + 1;
+      f.rag.push(Math.atan2(dx, dz), sp * (0.5 + 1.2 * f.drunk / 100));
+      f.rag.stun = 0.9 * (f.drunk / 100); // a drunk one loses his footing for a moment
+      f.rag.lastPush = 'shove';
+    }
     for (const f of ppl) {
       let dx = f.pos[0] - ox, dz = f.pos[1] - oz;
       const d = Math.hypot(dx, dz);
@@ -379,7 +390,6 @@ export class Game {
     if (full) {
       particles.drops(new THREE.Vector3(px, 0.3, pz), new THREE.Vector3(0, 1, 0), { n: 30, color: '#a9dcff', speed: 2, spread: 1, size: 0.02 });
       this.sfx.splash();
-      this.toast('Вода разлилась', 'info');
     }
   }
 
@@ -398,6 +408,8 @@ export class Game {
       this.dynamic.remove(old.root);
       this.dynamic.add(nf.root);
       f.figure = nf;
+      f.rag?.disable();
+      f.rag = new Ragdoll(nf.rig);
     }
   }
 
@@ -473,7 +485,10 @@ export class Game {
     this.puddles = [];
     for (const it of Object.values(this.furn.items)) this.setBroken(it, false);
 
-    for (const f of this.friends) this.dynamic.remove(f.figure.root);
+    for (const f of this.friends) {
+      f.rag?.disable();
+      this.dynamic.remove(f.figure.root);
+    }
     this.friends = FRIEND_IDS.map((id) => new Friend(this, id));
     for (const f of this.friends) {
       this.dynamic.add(f.figure.root);
@@ -559,7 +574,6 @@ export class Game {
     };
     this.dynamic.add(p);
     this.puddles.push(p);
-    this.toast(`Блевота: ${room.name}`, 'bad', room.name);
   }
 
   removePuddle(p) {
@@ -593,7 +607,6 @@ export class Game {
     this.state.hut -= TUNE.hut.smash;
     this.state.noise += TUNE.noise.smashHit;
     this.sfx.crash();
-    this.alert(`Лёха сломал: ${it.label}`, roomAt((it.x0 + it.x1) / 2, (it.z0 + it.z1) / 2)?.name);
   }
 
   pickToy() {
@@ -795,7 +808,6 @@ export class Game {
     v.figure.root.rotation.y = Math.atan2(dx - x, dz - z);
     this.dynamic.add(v.figure.root);
     this.visitor = v;
-    this.alert('Стучат в дверь… (глянь в камеру: F)', 'Прихожая');
     // someone knocks: the whole party shuts up (voices stop, music goes quiet) and hushes each other
     this.voices?.stopAll();
     this.koch = null;
@@ -1002,7 +1014,6 @@ export class Game {
     for (const [id, n] of Object.entries(cart)) for (let i = 0; i < n; i++) if (this.buy(id, true)) list.push(id);
     if (!list.length) return;
     const o = this.orders.find((x) => !x.done);
-    this.toast(`Заказ оформлен: ${o.title}. Курьер через ~${this.gameMinutes(o.eta)} мин`, 'good');
   }
 
   buy(id, quiet = false) {
@@ -1019,12 +1030,10 @@ export class Game {
       for (const [k, v] of Object.entries(item.gives)) open.gives[k] = (open.gives[k] ?? 0) + v;
       open.items.push(item.title);
       open.title = summarize(open.items);
-      if (!quiet) this.toast(`Добавил в заказ: ${item.title}. Тот же курьер, через ~${this.gameMinutes(open.eta)} мин`, 'info');
       return true;
     }
     const eta = rand(TUNE.delivery.min, TUNE.delivery.max);
     this.orders.push({ title: item.title, items: [item.title], icon: item.icon, gives: { ...item.gives }, eta, total: eta });
-    if (!quiet) this.toast(`Заказ: ${item.title}. Курьер будет через ~${this.gameMinutes(eta)} мин`, 'info');
     return true;
   }
 
@@ -1111,7 +1120,7 @@ export class Game {
               this.startFocus('drain', TUNE.cost.drain, (score) => {
                 this.stove = { phase: 'idle', t: 0 };
                 if (score <= 0) return this.toast('Все пельмени уплыли в раковину', 'bad');
-                if (this.inv.add('food', score) && score < 0.9) this.toast(`Спас ${Math.round(score * 100)}% пельменей`, 'warn');
+                this.inv.add('food', score);
               }),
           }];
         return [];
@@ -1166,46 +1175,8 @@ export class Game {
       vodka: [[-0.35, 0.22], [0.3, -0.22]].map(([a, b]) => place(makeBottle('vodka'), a, b)),
       food: [[-0.25, 0.05], [0.25, -0.02], [0, 0.28], [0, -0.28]].map(([a, b]) => place(makePlate(), a, b)),
     };
-    // a sign over the table: booze and food left, red when it ran out
-    const c = document.createElement('canvas');
-    c.width = 320;
-    c.height = 140;
-    const tex = new THREE.CanvasTexture(c);
-    tex.colorSpace = THREE.SRGBColorSpace;
-    const sign = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, transparent: true, depthTest: false, sizeAttenuation: false }));
-    sign.scale.set(0.13, 0.057, 1);
-    sign.renderOrder = 9;
-    sign.position.set(cx, 1.15, cz); // low over the table, so it reads as the table's
-    this.dynamic.add(sign);
-    this.tableSign = { c, tex, sign, key: '' };
   }
 
-  drawTableSign() {
-    const s = this.tableSign, t = this.state.table;
-    const booze = t.beer + t.vodka, food = t.food;
-    const key = `${booze}|${food}`;
-    if (key === s.key) return;
-    s.key = key;
-    const g = s.c.getContext('2d');
-    g.clearRect(0, 0, 320, 140);
-    // one dark pill, two halves: what's left on the table; an empty half turns red
-    const half = (x, emoji, n) => {
-      g.fillStyle = n > 0 ? 'rgba(14,13,18,0.85)' : 'rgba(190,40,30,0.92)';
-      g.beginPath();
-      g.roundRect(x, 30, 148, 80, 40);
-      g.fill();
-      g.font = '46px "Segoe UI Emoji", "Apple Color Emoji", "Noto Color Emoji", sans-serif';
-      g.textAlign = 'center';
-      g.textBaseline = 'middle';
-      g.fillText(emoji, x + 46, 72);
-      g.fillStyle = '#fff';
-      g.font = 'bold 44px "Russo One", Arial, sans-serif';
-      g.fillText(n > 0 ? String(n) : '0', x + 106, 72);
-    };
-    half(8, '🍺', booze);
-    half(164, '🍽️', food);
-    s.tex.needsUpdate = true;
-  }
 
   buildStoveProps() {
     this.cooking = new Cooking(this);
@@ -1260,7 +1231,6 @@ export class Game {
     o.thirst = Math.min(100, o.thirst + OT.rate * this.pace * dt);
     if (o.thirst > OT.from) {
       o.fun -= OT.drain * dt * ((o.thirst - OT.from) / (100 - OT.from));
-      this.toastOnce('olegThirst', 'Олегу надо выпить: возьми бутылку и нажми Q', 'warn', 25);
     }
     if (o.blackout > 0) {
       o.blackout -= dt;
@@ -1268,6 +1238,18 @@ export class Game {
     }
 
     for (const f of this.friends) f.update(dt);
+    // the ragdolls: motors follow the animation, the world pushes back
+    const [ox, oz] = this.olegPos, last = this.lastOleg ?? [ox, oz];
+    moveOleg(ox, oz, (ox - last[0]) / Math.max(dt, 1e-3), (oz - last[1]) / Math.max(dt, 1e-3));
+    this.lastOleg = [ox, oz];
+    updateDoors();
+    physicsStep(dt, () => {
+      for (const f of this.friends) if (f.rag?.active) f.rag.control(f.pos, f.drunk / 100, f.mode === 'walk');
+    });
+    for (const f of this.friends) {
+      f.physicsTick(dt);
+      if (f.rag?.active) f.rag.sync(f.figure);
+    }
     this.bumps();
     this.olegPhysics(dt);
     this.vibeTick(dt);
@@ -1343,7 +1325,6 @@ export class Game {
           type: 'courier', name: 'Курьер', shirt: '#e0a21b', patience: TUNE.visitors.courierPatience,
           onOpen: () => {
             for (const [k, v] of Object.entries(order.gives)) st.fridge[k] = (st.fridge[k] ?? 0) + v;
-            this.toast(`Курьер: ${order.title} — закинул в холодос`, 'good');
           },
           onTimeout: () => this.toast(`Курьер ушёл с заказом (${order.title}). Деньги сгорели`, 'bad'),
         });
@@ -1398,7 +1379,6 @@ export class Game {
     this.tableProps.beer.forEach((b, i) => (b.visible = i < Math.ceil(t.beer / TUNE.drink.beer.servings)));
     this.tableProps.vodka.forEach((b, i) => (b.visible = i < Math.ceil(t.vodka / TUNE.drink.vodka.servings)));
     this.tableProps.food.forEach((p, i) => (p.visible = i < t.food));
-    this.drawTableSign();
 
     // toasts
     for (const x of this.toasts) x.life -= dt;

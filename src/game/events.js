@@ -164,7 +164,6 @@ export class PartyEvents {
         g.state.noise += E.fightNoise;
         a.fun = clamp(a.fun - E.fightFun);
         b.fun = clamp(b.fun - E.fightFun);
-        g.toast(`${a.name} и ${b.name} подрались и что-то разнесли`, 'bad');
         (Math.random() < 0.5 ? a : b).fall?.(0.8);
         this.endQuarrel();
       }
@@ -189,7 +188,6 @@ export class PartyEvents {
     q.left -= dt;
     if (q.left <= 0) {
       q.fight = 2.5;
-      g.alert(`${a.name} и ${b.name} дерутся!`, a.room?.name);
     }
   }
 

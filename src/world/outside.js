@@ -49,10 +49,13 @@ export function buildOutside() {
     wall(x0, x1, z0, z1, extra);
   };
   sw(10.7, 10.9, -0.42, TOP[1]); // the outer side wall
-  sw(8.3, 8.5, END[0], TOP[1]); // against the flat (its own wall starts at its floor)
+  // against the flat: above its floor the flat's own wall is there already (two walls in one place flicker)
+  pbox(group, 8.3, 8.5, STREET, -1.1, END[0], TOP[1], paintLow);
+  pbox(group, 8.3, 8.5, -1.1, 0, END[0], TOP[1], paintHigh);
+  wall(8.3, 8.5, END[0], TOP[1]);
   // the front wall with the entrance door at the bottom
   const facade = new THREE.MeshStandardMaterial({ map: T.concrete(), color: '#8f8a80', roughness: 1 });
-  for (const [x0, x1] of [[8.3, DOOR[0]], [DOOR[1], 10.9]]) {
+  for (const [x0, x1] of [[8.5, DOOR[0]], [DOOR[1], 10.9]]) { // from the flat's corner on
     pbox(group, x0, x1, STREET, H + 0.4, -0.42, 0, facade, 1);
     wall(x0, x1, -0.42, 0);
   }
@@ -60,7 +63,7 @@ export function buildOutside() {
   wall(DOOR[0], DOOR[1], -0.42, 0, { floor: [-3.4, 9] }); // a door only down at the street
   pbox(group, DOOR[0] - 0.75, DOOR[0], STREET, STREET + 2.05, -0.55, -0.45, mat('#5a3a24')); // the door leaf, open out
   pbox(group, DOOR[0] - 0.3, DOOR[1] + 0.3, STREET + 2.3, STREET + 2.4, -1.1, -0.42, mat('#5b5752')); // canopy
-  ceiling.add(pbox(new THREE.Group(), 8.3, 10.9, H, H + 0.15, -0.42, TOP[1], mat('#bdb9ad')));
+  ceiling.add(pbox(new THREE.Group(), 8.5, 10.9, H, H + 0.15, -0.42, TOP[1], mat('#bdb9ad')));
 
   // ---- stairs: steps you see, a ramp the camera follows (heightAt)
   const lane = (a) => (a ? [SX[0], LANE - 0.05] : [LANE + 0.05, SX[1]]);
