@@ -495,7 +495,7 @@ export class Friend extends Walker {
   animate(dt) {
     const d = this.drunk / 100;
     const [ox, oz] = this.game.olegPos;
-    this.figure.showName?.(Math.hypot(ox - this.pos[0], oz - this.pos[1]) < 4.5); // names only up close
+    this.figure.showName?.(Math.hypot(ox - this.pos[0], oz - this.pos[1]) < 3.2); // names only up close
     const loop = this.animLoop();
     this.figure.setLoop(loop);
     this.figure.setFace?.(this.faceState());
@@ -1114,7 +1114,7 @@ export class Cat extends Walker {
     if (this.gone) return;
     const g = this.game, C = TUNE.cat;
     this.t += dt;
-    this.figure.showName?.(!this.carried && Math.hypot(g.olegPos[0] - this.pos[0], g.olegPos[1] - this.pos[1]) < 4.5); // like the guys: only up close
+    this.figure.showName?.(!this.carried && Math.hypot(g.olegPos[0] - this.pos[0], g.olegPos[1] - this.pos[1]) < 3.2); // like the guys: only up close
     if (this.carried) {
       this.pos = [...g.olegPos];
       this.fun = clamp(this.fun + C.heldFun * dt);

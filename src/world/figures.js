@@ -99,7 +99,11 @@ function makeTags(root, name, label) {
       if (nameTag) nameTag.visible = v;
     },
     say(text, seconds = 3.5) {
-      if (speech) root.remove(speech);
+      if (speech) {
+        root.remove(speech);
+        speech.material.map.dispose();
+        speech.material.dispose();
+      }
       speech = textSprite(`«${text}»`, { bg: 'rgba(250,246,236,0.95)', fg: '#1b1408', size: 34 });
       speechLeft = seconds;
       root.add(speech);
@@ -115,6 +119,7 @@ function makeTags(root, name, label) {
       if (speech && (speechLeft -= dt) <= 0) {
         root.remove(speech);
         speech.material.map.dispose();
+        speech.material.dispose();
         speech = null;
       }
     },
