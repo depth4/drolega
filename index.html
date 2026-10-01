@@ -13,26 +13,27 @@
 
     <div id="hud" hidden>
       <div class="hud-tl">
-        <div class="clock"><span id="night">НОЧЬ 1</span><b id="time">22:00</b></div>
-        <div class="room" id="room">Прихожая</div>
+        <div class="clock"><span id="night">НОЧЬ 1</span><b id="time">22:00</b><span class="room" id="room"></span></div>
+        <section class="panel crew"><h3>Пацаны</h3><div id="people"></div></section>
       </div>
-      <div class="hud-tr">
-        <div class="meter" title="Общее веселье"><img id="ico-fun" alt=""><div class="bar fun"><i id="bar-total"></i></div></div>
-        <div class="meter" title="Состояние хаты"><img id="ico-hut" alt=""><div class="bar hut"><i id="bar-hut"></i></div></div>
-        <div class="meter" title="Соседи"><img id="ico-noise" alt=""><div class="bar noise"><i id="bar-noise"></i></div><span id="anger"></span></div>
-      </div>
-      <div class="people" id="people"></div>
+      <section class="panel hud-tr">
+        <div class="stat"><label>Веселье</label><div class="bar fun"><i id="bar-total"></i></div></div>
+        <div class="stat"><label>Хата</label><div class="bar hut"><i id="bar-hut"></i></div></div>
+        <div class="stat"><label>Соседи<em id="anger"></em></label><div class="bar noise"><i id="bar-noise"></i></div></div>
+      </section>
+      <section class="panel oleg">
+        <h3>Олег <em id="othirst" hidden>хочет выпить</em></h3>
+        <div class="stat"><label>Веселье</label><div class="bar ofun"><i id="bar-ofun"></i></div></div>
+        <div class="stat"><label>Силы</label><div class="bar energy"><i id="bar-energy"></i></div></div>
+      </section>
       <div class="toasts" id="toasts"></div>
       <div class="door-alert" id="door-alert" hidden>Стучат в дверь · F — камера</div>
       <div class="crosshair"></div>
       <div class="prompt" id="prompt"></div>
       <div class="use" id="use" hidden><span id="use-label"></span><div class="bar"><i id="use-bar"></i></div></div>
-      <div class="oleg-bars">
-        <div class="meter" title="Веселье Олега"><img id="ico-ofun" alt=""><div class="bar ofun"><i id="bar-ofun"></i></div><img id="ico-othirst" class="thirst" alt="" hidden></div>
-        <div class="meter" title="Силы Олега"><img id="ico-energy" alt=""><div class="bar energy"><i id="bar-energy"></i></div></div>
-      </div>
+      <div class="hand-name" id="hand-name"></div>
       <div class="hotbar" id="hotbar"></div>
-      <div class="keys-hint">F телефон · Q выпить / погладить кота · G положить</div>
+      <div class="keys-hint">F телефон · C фото · Q выпить · G положить</div>
       <div class="blackout" id="blackout" hidden>Олег вырубился…</div>
       <div class="viewfinder" id="viewfinder" hidden><i></i><i></i><i></i><i></i><span id="vf-count">0/3</span><small>ЛКМ — снять · C — убрать камеру</small></div>
       <div class="flash" id="flash"></div>
@@ -40,6 +41,7 @@
     </div>
 
     <div id="phone" hidden>
+      <div class="phone-hand" aria-hidden="true"><i></i><i></i></div>
       <div class="phone-top"><span id="phone-time">22:00</span><span class="phone-money" id="phone-money">3000 ₽</span></div>
       <div class="phone-screen">
         <div class="phone-cam" id="phone-cam">
@@ -70,6 +72,10 @@
           <button id="btn-play" class="primary" type="button">Начать ночь 1</button>
           <button id="btn-orbit" type="button">Посмотреть хату сверху</button>
           <button id="btn-style" type="button">Бошки: кубы</button>
+        </div>
+        <div class="night-pick" id="night-pick">
+          <span>Сразу в ночь</span>
+          <button type="button" data-night="1">1</button><button type="button" data-night="2">2</button><button type="button" data-night="3">3</button><button type="button" data-night="4">4</button><button type="button" data-night="5">5</button>
         </div>
         <p class="mobile-note" id="mobile-note" hidden>Играть — с компа (мышь + клавиатура). С телефона можно посмотреть хату сверху.</p>
         <dl class="controls">

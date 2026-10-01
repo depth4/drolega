@@ -61,7 +61,7 @@ function framer(item, group) {
     return mesh;
   };
   return {
-    U, D, world,
+    U, D, world, group,
     box(u0, u1, y0, y1, v0, v1, material) {
       const [ax, az] = world(u0, v0), [bx, bz] = world(u1, v1);
       return add(boxGeo(Math.min(ax, bx), Math.max(ax, bx), y0, y1, Math.min(az, bz), Math.max(az, bz)), material);
@@ -231,8 +231,27 @@ const BUILD = {
     const { U, D } = f;
     f.box(0.02, U - 0.02, 0, 0.58, 0, D, M.enamel);
     f.box(0.09, U - 0.09, 0.2, 0.585, 0.07, D - 0.07, M.water);
-    f.cyl(U - 0.15, 0.03, 0.6, 0.9, 0.015, 0.015, M.metal);
-    f.sph(U - 0.15, 0.03, 1.5, 0.05, M.metal).userData.showerHead = true; // the hand shower: Oleg can take it
+    // shower: mixer above the rim, a vertical rail with a holder, the hand shower hanging on it, a hose
+    const u = U - 0.18;
+    f.box(u - 0.09, u + 0.09, 0.72, 0.8, -0.005, 0.05, M.metal).userData.mixer = true;
+    f.cyl(u - 0.06, 0.07, 0.74, 0.78, 0.02, 0.02, M.metal); // knobs
+    f.cyl(u + 0.06, 0.07, 0.74, 0.78, 0.02, 0.02, M.metal);
+    f.cyl(u, 0.025, 0.95, 1.95, 0.011, 0.011, M.metal); // rail
+    f.box(u - 0.025, u + 0.025, 1.68, 1.72, 0.01, 0.06, M.metal); // holder
+    const head = [
+      f.cyl(u, 0.055, 1.52, 1.72, 0.017, 0.021, M.metal), // handle
+      f.cyl(u, 0.055, 1.72, 1.75, 0.045, 0.04, M.metal), // head
+    ];
+    for (const m of head) m.userData.showerHead = true; // Oleg can take it (interact.js)
+    // hose on the wall: from the mixer down in a loop and up to the handle
+    const P = (uu, vv, y) => {
+      const [x, z] = f.world(uu, vv);
+      return new THREE.Vector3(x, y, z);
+    };
+    const curve = new THREE.CatmullRomCurve3([P(u, 0.04, 0.72), P(u, 0.09, 0.6), P(u, 0.1, 0.62), P(u, 0.08, 1.0), P(u, 0.055, 1.52)]);
+    const hose = new THREE.Mesh(new THREE.TubeGeometry(curve, 24, 0.011, 6, false), mat('#8b9298', { metalness: 0.6, roughness: 0.35 }));
+    hose.userData.staticHose = true;
+    f.group.add(hose);
   },
   bathSink(f) {
     const { U, D } = f;

@@ -59,6 +59,13 @@ class Walker {
     root.position.set(this.pos[0] + ox, this.spot?.pose || this.mode === 'walk' ? 0 : this.y, this.pos[1] + oz);
     root.rotation.y = this.heading + yaw;
   }
+  // off the sofa / chair: standing on his feet where he is
+  standUp() {
+    this.spot = null;
+    this.y = 0;
+    this.figure.setPose?.('stand');
+    this.applyTransform();
+  }
   walkTo(spot, onArrive, blocked) {
     const r = route(this.node, this.pos, spot.node, spot.p, blocked);
     if (!r) return false;
@@ -252,7 +259,7 @@ const PROBLEMS = {
           t = 0;
           g.breakSomething(f.room?.id);
           const next = ['sofaA', 'kitchen', 'bedroom', 'hall', 'table2'][Math.floor(Math.random() * 5)];
-          f.walkTo(SPOTS[next]);
+          f.walkTo({ ...SPOTS[next], pose: null, y: 0 }); // smashes standing, never sits down
         }
       },
       actions: () => [{
@@ -261,6 +268,7 @@ const PROBLEMS = {
           // he follows Oleg along his footsteps; Oleg has to walk him into the bathroom himself
           f.path = null;
           f.mode = 'idle';
+          f.standUp();
           f.follow = { trail: [[...f.pos]], idx: 0 };
           g.leading = f;
           f.problem = { id: 'led', text: 'идёт за тобой, веди в санузел', short: 'ИДЁТ ЗА ТОБОЙ', drain: 0, since: 0, actions: () => [] };
@@ -927,10 +935,24 @@ export class Cat extends Walker {
       this.fun = clamp(this.fun + C.heldFun * dt);
       return;
     }
+    // a mouse on the floor nearby: he goes after it
+    const toy = g.toyLoose ? g.toy.position : null;
+    if (toy && this.playLeft <= 0 && this.problem?.id !== 'rail' && Math.hypot(toy.x - this.pos[0], toy.z - this.pos[1]) < C.noticeRange) {
+      this.playLeft = C.toyPlay;
+      this.path = null;
+      this.mode = 'chase';
+      this.spot = null;
+      this.y = 0;
+      this.ready = rand(0.3, 0.8);
+      g.toastOnce('catToy', 'Кот погнался за мышкой', 'good', 8);
+    }
+    this.running = false;
     if (this.playLeft > 0) {
       this.playLeft -= dt;
       this.fun += C.toyFun * dt;
-      if (this.playLeft <= 0) g.respawnToy();
+      if (!toy) this.endPlay(false);
+      else if (this.playLeft <= 0) this.endPlay(true);
+      else this.chase(dt, toy);
     } else this.fun -= C.boredom * dt;
 
     const room = this.room?.id;
@@ -940,7 +962,7 @@ export class Cat extends Walker {
 
     if (room === 'balcony') {
       this.balconyT += dt;
-      if (this.balconyT >= C.climbAfter && this.mode !== 'walk' && this.spot?.id !== 'catRail' && this.problem?.id !== 'rail') {
+      if (this.balconyT >= C.climbAfter && this.mode !== 'walk' && this.playLeft <= 0 && this.spot?.id !== 'catRail' && this.problem?.id !== 'rail') {
         this.walkTo(CAT_SPOTS.catRail, () => this.setProblem('rail', 'лезет в открытую створку на балконе!', 'В ОКНЕ', 0));
       }
       if (this.problem?.id === 'rail') {
@@ -958,7 +980,95 @@ export class Cat extends Walker {
     }
     this.fun = clamp(this.fun);
     this.applyTransform();
-    this.figure.animate(this.t, this.mode === 'walk');
+    this.batT = Math.max(0, (this.batT ?? 0) - dt);
+    this.figure.animate(this.t, this.mode === 'walk' || this.running, {
+      run: this.running || (this.mode === 'walk' && this.playLeft > 0),
+      crouch: this.crouch ?? 0,
+      pounce: this.pounce ?? 0,
+      bat: this.batT / 0.3,
+    });
+  }
+
+  // playing: run after the mouse, crouch, wiggle, pounce, swipe it away with a paw, again
+  chase(dt, toy) {
+    const g = this.game, C = TUNE.cat;
+    const toyRoom = roomAt(toy.x, toy.z)?.id, mine = this.room?.id;
+    if (toyRoom && mine && toyRoom !== mine) {
+      // it skidded into another room: walk round through the door
+      if (this.mode !== 'walk' || this.chaseRoom !== toyRoom) {
+        this.chaseRoom = toyRoom;
+        this.crouch = this.pounce = 0;
+        if (!this.walkTo({ id: 'toy', node: nearestNode(toy.x, toy.z), p: [toy.x, toy.z], pose: null }, () => (this.mode = 'chase'), this.blockedNodes())) this.endPlay(false);
+      }
+      return;
+    }
+    this.chaseRoom = null;
+    if (this.mode === 'walk') this.path = null;
+    this.mode = 'chase';
+    const dx = toy.x - this.pos[0], dz = toy.z - this.pos[1], d = Math.hypot(dx, dz);
+    const toyFast = Math.hypot(g.toyVel.x, g.toyVel.z) > 0.35;
+    if (this.pounce > 0) {
+      // in the air, landing on it
+      this.pounce = Math.min(1, this.pounce + dt / 0.42);
+      const [ax, az, bx, bz] = this.leap;
+      this.pos = [ax + (bx - ax) * this.pounce, az + (bz - az) * this.pounce];
+      if (this.pounce >= 1) {
+        this.pounce = 0;
+        if (d < 0.35) {
+          g.kickToy(this.heading + rand(-1, 1), rand(1.4, 3.2), rand(0.8, 1.8));
+          g.sfx.squeak?.();
+        }
+        this.ready = rand(0.6, 1.3);
+      }
+      return;
+    }
+    this.heading = Math.atan2(dx, dz);
+    if (d > 0.9) {
+      // after it at a run
+      this.crouch = Math.max(0, (this.crouch ?? 0) - dt * 4);
+      const step = Math.min(d - 0.5, C.run * dt);
+      if (step > 0) {
+        this.pos = [this.pos[0] + (dx / d) * step, this.pos[1] + (dz / d) * step];
+        this.running = true;
+      }
+    } else if (toyFast) {
+      // it's still sliding: creep after it, eyes on it
+      this.crouch = Math.min(0.6, (this.crouch ?? 0) + dt * 2);
+      const step = Math.min(d - 0.4, 0.7 * dt);
+      if (step > 0) this.pos = [this.pos[0] + (dx / d) * step, this.pos[1] + (dz / d) * step];
+    } else if (d > 0.3) {
+      // it stopped: flat to the floor, tail going, rear end wiggling... and jump
+      this.crouch = Math.min(1, (this.crouch ?? 0) + dt * 3);
+      this.ready = (this.ready ?? 0) - dt;
+      if (this.ready <= 0) {
+        this.crouch = 0;
+        this.pounce = 0.001;
+        this.leap = [this.pos[0], this.pos[1], toy.x - (dx / d) * 0.12, toy.z - (dz / d) * 0.12];
+      }
+    } else if (this.batT <= 0) this.swipe();
+  }
+
+  swipe() {
+    this.batT = 0.3;
+    this.crouch = 0;
+    this.game.kickToy(this.heading + rand(-1.3, 1.3), rand(0.7, 2.4), rand(0.5, 1.6));
+    this.ready = rand(0.8, 1.6);
+  }
+
+  // done playing; `hid` = he knocked the mouse away under the furniture (go find it again)
+  endPlay(hid) {
+    const g = this.game;
+    this.playLeft = 0;
+    this.crouch = this.pounce = 0;
+    this.path = null;
+    this.mode = 'idle';
+    this.idleLeft = rand(3, 6);
+    this.node = nearestNode(this.pos[0], this.pos[1]);
+    this.spot = { id: 'floor', node: this.node, p: [...this.pos], pose: null };
+    if (hid && g.toyLoose) {
+      g.respawnToy();
+      g.toast('Кот наигрался и загнал мышку куда-то под мебель', 'info');
+    }
   }
 
   wander() {
@@ -990,13 +1100,8 @@ export class Cat extends Walker {
     }
     if (g.inv.has('toy') && this.playLeft <= 0) {
       list.push({
-        key: 'R', text: 'Дать мышку',
-        run: () => {
-          g.inv.remove('toy');
-          this.playLeft = TUNE.cat.toyPlay;
-          this.idleLeft = 0;
-          g.toast('Кот играет с мышкой', 'good');
-        },
+        key: 'R', text: 'Кинуть ему мышку',
+        run: () => g.giveToy(this),
       });
     }
     return list;

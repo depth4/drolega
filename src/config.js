@@ -138,6 +138,9 @@ export const TUNE = {
     heldFun: 1.5, // calms down in Oleg's hands
     pet: 20, // quick but small
     toyPlay: 25, // seconds of play
+    throwSpeed: 4.5, // m/s, LMB with the mouse in hand
+    noticeRange: 9, // a mouse on the floor this close and he goes after it
+    run: 2.6, // m/s chasing it
     toyFun: 2.5, // per second while playing
     balconyPull: 2.5, // how much more the cat wants the balcony when the door is open
     climbAfter: 10, // seconds on the balcony before it climbs the railing

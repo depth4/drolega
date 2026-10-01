@@ -67,7 +67,7 @@ class Inventory {
     if (!item) return;
     this.slots[this.sel] = null;
     if (item === 'shower') return this.game.hands.returnShower();
-    if (item === 'toy') this.game.respawnToy();
+    if (item === 'toy') this.game.dropToy();
     else if (item === 'cat') this.game.dropCat();
     else if (['beer', 'vodka', 'food'].includes(item)) this.game.state.fridge[item] += 1; // back to the fridge
   }
@@ -100,7 +100,9 @@ export class Game {
     this.buildStoveProps();
     this.buildGrillProps();
     this.toy = makeToy();
-    this.toy.userData.target = { name: 'Мышка кота', actions: () => [{ key: 'E', text: 'Взять мышку', run: () => this.inv.add('toy') && (this.toy.visible = false) }] };
+    this.toy.userData.target = { name: 'Мышка кота', actions: () => [{ key: 'E', text: 'Взять мышку', run: () => this.pickToy() }] };
+    this.toyVel = new THREE.Vector3();
+    this.toyLoose = false; // thrown / dropped on the floor: the cat goes after it
     this.dynamic.add(this.toy);
   }
 
@@ -297,7 +299,93 @@ export class Game {
     this.alert(`Лёха сломал: ${it.label}`, roomAt((it.x0 + it.x1) / 2, (it.z0 + it.z1) / 2)?.name);
   }
 
+  pickToy() {
+    if (!this.inv.add('toy')) return;
+    this.toy.visible = false;
+    this.toyLoose = false;
+    this.cat.playLeft = 0;
+  }
+
+  // the mouse leaves Oleg's hand: thrown along `dir`, or just dropped in front of the cat
+  throwToy(from, dir, speed = TUNE.cat.throwSpeed) {
+    if (!this.inv.has('toy')) return;
+    this.inv.remove('toy');
+    this.toy.position.copy(from);
+    this.toy.position.y = Math.max(0.3, from.y);
+    this.toyVel.copy(dir).setY(0).normalize().multiplyScalar(speed);
+    this.toyVel.y = 1.2 + dir.y * speed * 0.5;
+    this.toy.visible = true;
+    this.toyLoose = true;
+    this.sfx.whoosh?.();
+  }
+
+  // G: just put it on the floor in front of Oleg
+  dropToy() {
+    const [x, z] = this.olegPos, yaw = this.olegYaw ?? 0;
+    let px = x - Math.sin(yaw) * 0.5, pz = z - Math.cos(yaw) * 0.5;
+    if (this.toyBlocked(px, pz)) [px, pz] = [x, z];
+    this.toy.position.set(px, 0.4, pz);
+    this.toyVel.set(0, 0, 0);
+    this.toy.visible = true;
+    this.toyLoose = true;
+  }
+
+  // R on the cat: toss it on the floor right in front of him
+  giveToy(cat) {
+    if (!this.inv.has('toy')) return;
+    this.inv.remove('toy');
+    let [px, pz] = cat.front(0.45);
+    if (this.toyBlocked(px, pz)) [px, pz] = cat.pos;
+    this.toy.position.set(px, 0.35, pz);
+    this.toyVel.set(0, 0.5, 0);
+    this.toy.visible = true;
+    this.toyLoose = true;
+  }
+
+  // a swipe of the paw sends it skidding
+  kickToy(angle, speed, up = 1.2) {
+    this.toyVel.set(Math.sin(angle) * speed, up, Math.cos(angle) * speed);
+    this.toy.position.y = Math.max(this.toy.position.y, 0.02);
+  }
+
+  toyBlocked(x, z) {
+    const r = 0.06;
+    for (const c of [...this.apt.colliders, ...this.furn.colliders]) {
+      if (c.enabled === false) continue;
+      if (c.seg) {
+        const [ax, az, bx, bz] = c.seg;
+        const vx = bx - ax, vz = bz - az;
+        const t = Math.max(0, Math.min(1, ((x - ax) * vx + (z - az) * vz) / (vx * vx + vz * vz)));
+        if (Math.hypot(x - ax - vx * t, z - az - vz * t) < c.r + r) return true;
+      } else if (x > c.x0 - r && x < c.x1 + r && z > c.z0 - r && z < c.z1 + r) return true;
+    }
+    return !roomAt(x, z);
+  }
+
+  updateToy(dt) {
+    if (!this.toyLoose) return;
+    const p = this.toy.position, v = this.toyVel;
+    if (p.y <= 0.006 && Math.hypot(v.x, v.z) < 0.03 && Math.abs(v.y) < 0.01) return; // lying still
+    v.y -= 9.8 * dt;
+    const nx = p.x + v.x * dt, nz = p.z + v.z * dt;
+    if (this.toyBlocked(nx, p.z)) v.x *= -0.45;
+    else p.x = nx;
+    if (this.toyBlocked(p.x, nz)) v.z *= -0.45;
+    else p.z = nz;
+    p.y += v.y * dt;
+    if (p.y <= 0.005) {
+      p.y = 0.005;
+      v.y = v.y < -1.2 ? -v.y * 0.35 : 0; // a little bounce, then it slides
+      const k = Math.max(0, 1 - 2.6 * dt);
+      v.x *= k;
+      v.z *= k;
+    }
+    const sp = Math.hypot(v.x, v.z);
+    if (sp > 0.05) this.toy.rotation.y = Math.atan2(v.x, v.z) + Math.PI;
+  }
+
   respawnToy() {
+    this.toyLoose = false;
     let i;
     do i = Math.floor(Math.random() * TOY_SPOTS.length);
     while (i === this.lastToy && TOY_SPOTS.length > 1);
@@ -739,9 +827,9 @@ export class Game {
     const tex = new THREE.CanvasTexture(c);
     tex.colorSpace = THREE.SRGBColorSpace;
     const sign = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, transparent: true, depthTest: false, sizeAttenuation: false }));
-    sign.scale.set(0.16, 0.07, 1);
+    sign.scale.set(0.13, 0.057, 1);
     sign.renderOrder = 9;
-    sign.position.set(cx, 1.55, cz);
+    sign.position.set(cx, 1.15, cz); // low over the table, so it reads as the table's
     this.dynamic.add(sign);
     this.tableSign = { c, tex, sign, key: '' };
   }
@@ -754,20 +842,22 @@ export class Game {
     s.key = key;
     const g = s.c.getContext('2d');
     g.clearRect(0, 0, 320, 140);
-    const cell = (x, name, n) => {
-      g.fillStyle = n > 0 ? 'rgba(20,18,24,0.82)' : 'rgba(170,30,25,0.92)';
+    // one dark pill, two halves: what's left on the table; an empty half turns red
+    const half = (x, emoji, n) => {
+      g.fillStyle = n > 0 ? 'rgba(14,13,18,0.85)' : 'rgba(190,40,30,0.92)';
       g.beginPath();
-      g.roundRect(x, 10, 150, 120, 26);
+      g.roundRect(x, 30, 148, 80, 40);
       g.fill();
-      g.drawImage(icon(name, 96), x + 6, 22, 96, 96);
-      g.fillStyle = '#fff';
-      g.font = 'bold 64px "Russo One", Arial, sans-serif';
+      g.font = '46px "Segoe UI Emoji", "Apple Color Emoji", "Noto Color Emoji", sans-serif';
       g.textAlign = 'center';
       g.textBaseline = 'middle';
-      g.fillText(n > 0 ? String(n) : '!', x + 124, 72);
+      g.fillText(emoji, x + 46, 72);
+      g.fillStyle = '#fff';
+      g.font = 'bold 44px "Russo One", Arial, sans-serif';
+      g.fillText(n > 0 ? String(n) : '0', x + 106, 72);
     };
-    cell(4, 'booze', booze);
-    cell(166, 'food', food);
+    half(8, '🍺', booze);
+    half(164, '🍽️', food);
     s.tex.needsUpdate = true;
   }
 
@@ -833,6 +923,7 @@ export class Game {
 
     for (const f of this.friends) f.update(dt);
     particles.update(dt);
+    this.updateToy(dt);
     this.cat.update(dt);
     for (const d of Object.values(this.doors)) d.update(dt);
     if (this.entranceCloseT > 0) {

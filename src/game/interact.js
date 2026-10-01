@@ -3,6 +3,7 @@
 //   rag: scrub a puddle by moving the mouse while holding the button
 //   empty hand on a coughing guy: pat him on the back, click by click, in a steady rhythm
 //   empty hand on a sleeping guy: hold and shake the mouse left-right to shake him awake
+//   the cat's mouse: click to throw it, the cat chases it
 // Everything costs Oleg's strength while he does it. Returns what to show under the crosshair.
 import * as THREE from 'three';
 import { TUNE } from '../config.js';
@@ -22,11 +23,16 @@ export class Interactions {
 
   // the tub's shower head: taking it off the wall gives you the hand shower
   attachShower(tubGroup) {
-    tubGroup.traverse((o) => o.userData.showerHead && (this.showerHeadMesh = o));
-    const m = this.showerHeadMesh;
-    if (!m) return;
-    m.geometry.computeBoundingSphere();
-    this.mixer = m.geometry.boundingSphere.center.clone();
+    this.headParts = [];
+    let mixer = null;
+    tubGroup.traverse((o) => {
+      if (o.userData.showerHead || o.userData.staticHose) this.headParts.push(o);
+      if (o.userData.mixer) mixer = o;
+    });
+    if (!mixer || !this.headParts.length) return;
+    mixer.geometry.computeBoundingSphere();
+    this.mixer = mixer.geometry.boundingSphere.center.clone();
+    this.showerHeadMesh = { set visible(v) { for (const p of this.parts) p.visible = v; }, parts: this.headParts };
     const tube = new THREE.Mesh(new THREE.BufferGeometry(), mat('#8b9298', { metalness: 0.6, roughness: 0.35 }));
     tube.visible = false;
     tube.frustumCulled = false;
@@ -96,6 +102,12 @@ export class Interactions {
         }
       }
       hud ??= { label: 'Поливаешь', progress: null };
+    }
+
+    // ---- the cat's mouse: throw it, he runs after it
+    if (held === 'toy' && input.hand && !tgt?.cat) {
+      if (input.pressed) g.throwToy(input.hand, input.dir);
+      else hud = { label: 'ЛКМ — кинуть мышку коту', progress: null };
     }
 
     // ---- scrubbing a puddle with the rag

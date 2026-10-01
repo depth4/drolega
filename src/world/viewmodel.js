@@ -31,8 +31,7 @@ function item(type) {
     g.add(new THREE.Mesh(new THREE.CylinderGeometry(0.045, 0.04, 0.035, 16).rotateX(Math.PI / 2).translate(0, 0.015, -0.18), metal));
   } else if (type === 'cat') {
     // the cat curled up in his arms
-    const c = makeCat().root;
-    c.traverse((o) => o.isSprite && (o.visible = false));
+    const c = makeCat({ label: false }).root;
     c.scale.setScalar(1.2);
     c.rotation.set(0, Math.PI * 0.6, 0);
     c.position.set(-0.12, -0.12, -0.05);

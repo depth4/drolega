@@ -1,7 +1,7 @@
 // DOM HUD: meters, participants, toasts, interaction prompt, hotbar, phone, end screen.
 import { TUNE } from '../config.js';
 import { ITEMS } from '../game/game.js';
-import { iconURL, iconImg } from './icons.js';
+import { iconURL, iconImg, hasRealIcon } from './icons.js';
 
 const $ = (id) => document.getElementById(id);
 const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
@@ -9,7 +9,7 @@ const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&l
 export function createHUD({ onBuy }) {
   const el = {
     hud: $('hud'), night: $('night'), time: $('time'), room: $('room'),
-    energy: $('bar-energy'), ofun: $('bar-ofun'), othirst: $('ico-othirst'), total: $('bar-total'), hut: $('bar-hut'), noise: $('bar-noise'), anger: $('anger'), people: $('people'), toasts: $('toasts'),
+    energy: $('bar-energy'), ofun: $('bar-ofun'), othirst: $('othirst'), handName: $('hand-name'), total: $('bar-total'), hut: $('bar-hut'), noise: $('bar-noise'), anger: $('anger'), people: $('people'), toasts: $('toasts'),
     prompt: $('prompt'), hotbar: $('hotbar'), doorAlert: $('door-alert'), blackout: $('blackout'),
     phone: $('phone'), phoneTime: $('phone-time'), phoneMoney: $('phone-money'),
     tabCam: $('tab-cam'), tabShop: $('tab-shop'), cam: $('phone-cam'), camView: $('cam-view'), camWho: $('cam-who'),
@@ -28,7 +28,6 @@ export function createHUD({ onBuy }) {
   let idx = 0;
   let money = 0;
   $('ico-cam').src = iconURL('camera');
-  for (const [id, name] of [['ico-fun', 'fun'], ['ico-hut', 'hut'], ['ico-noise', 'neighbours'], ['ico-energy', 'energy'], ['ico-ofun', 'fun'], ['ico-othirst', 'beer']]) $(id).src = iconURL(name);
   $('ico-shop').src = iconURL('cart');
   const renderCard = () => {
     const it = items[idx];
@@ -91,7 +90,7 @@ export function createHUD({ onBuy }) {
   el.tabCam.addEventListener('click', () => tab('cam'));
   el.tabShop.addEventListener('click', () => tab('shop'));
 
-  const bar = (v, cls = '') => `<div class="bar thin ${cls} ${v < 25 ? 'low' : ''}"><i style="width:${Math.max(0, Math.min(100, v)).toFixed(0)}%"></i></div>`;
+  const bar = (v, cls = '') => `<div class="bar ${cls} ${v < 25 ? 'low' : ''}"><i style="width:${Math.max(0, Math.min(100, v)).toFixed(0)}%"></i></div>`;
 
   return {
     el,
@@ -130,17 +129,13 @@ export function createHUD({ onBuy }) {
       el.energy.parentElement.classList.toggle('low', game.oleg.energy < 20);
       el.ofun.style.width = `${game.oleg.fun}%`;
       el.ofun.parentElement.classList.toggle('low', game.oleg.fun < 25);
-      el.othirst.hidden = game.oleg.thirst < TUNE.olegThirst.from; // a beer icon: Oleg wants a drink
+      el.othirst.hidden = game.oleg.thirst < TUNE.olegThirst.from; // Oleg wants a drink
 
       // who needs Oleg: name, fun, and a "!" when something is wrong (what exactly — look at him)
-      const alert = iconImg('alert', 'alert');
+      const row = (name, fun, bad) => `<div class="row ${bad ? 'bad' : ''}"><span class="name">${esc(name)}</span><span class="badge ${bad ? '' : 'off'}">!</span>${bar(fun)}</div>`;
       const rows = [
-        ...game.friends.map((f) => `<div class="person ${f.problem ? 'alarm' : ''}"><span class="name">${esc(f.name)}</span>${f.problem ? alert : '<span></span>'}${bar(f.fun)}</div>`),
-        (() => {
-          const c = game.cat;
-          const bad = c.gone || c.problem;
-          return `<div class="person ${bad ? 'alarm' : ''}"><span class="name">Кот</span>${bad ? alert : '<span></span>'}${bar(c.gone ? 0 : c.fun)}</div>`;
-        })(),
+        ...game.friends.map((f) => row(f.name, f.fun, !!f.problem)),
+        row('Кот', game.cat.gone ? 0 : game.cat.fun, !!(game.cat.gone || game.cat.problem)),
       ];
       set('people', el.people, rows.join(''));
 
@@ -161,9 +156,12 @@ export function createHUD({ onBuy }) {
       }
       set('prompt', el.prompt, p);
 
+      // a real (Qwen) icon if there is one, otherwise the emoji
+      const pic = (it) => (hasRealIcon(it) ? iconImg(it, '') : `<span class="emo">${ITEMS[it].icon}</span>`);
       set('hotbar', el.hotbar, game.inv.slots
-        .map((it, i) => `<div class="slot ${i === game.inv.sel ? 'sel' : ''}"><span class="k">${i + 1}</span>${it ? `${iconImg(it, '')}<span class="lbl">${ITEMS[it].name}</span>` : ''}</div>`)
+        .map((it, i) => `<div class="slot ${i === game.inv.sel ? 'sel' : ''}"><span class="k">${i + 1}</span>${it ? pic(it) : ''}</div>`)
         .join(''));
+      el.handName.textContent = game.inv.selectedItem() ? ITEMS[game.inv.selectedItem()].name : '';
 
       el.doorAlert.hidden = !game.visitor || !el.phone.hidden;
       el.blackout.hidden = !(game.oleg.blackout > 0);

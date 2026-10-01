@@ -2,9 +2,35 @@
 // People face local +z (Object3D.lookAt points +z at the target).
 import * as THREE from 'three';
 import { mat } from './apartment.js';
-import { drawFace, faceAspect, hasMoodFaces, moodState, moodFace } from './faces.js';
+import { drawFace, faceAspect, hasMoodFaces, moodState, moodFace, moodHasNeck } from './faces.js';
 import { createRig } from './anim.js';
-import { iconTexture } from '../ui/icons.js';
+import { iconTexture, hasRealIcon } from '../ui/icons.js';
+
+// the "!" over someone with a problem: the Qwen icon if there is one, else a plain red badge
+let badgeTex = null;
+function alertTexture() {
+  if (hasRealIcon('alert')) return iconTexture('alert');
+  if (badgeTex) return badgeTex;
+  const c = document.createElement('canvas');
+  c.width = c.height = 128;
+  const g = c.getContext('2d');
+  g.fillStyle = 'rgba(224,65,47,0.35)';
+  g.beginPath();
+  g.arc(64, 64, 62, 0, Math.PI * 2);
+  g.fill();
+  g.fillStyle = '#e0412f';
+  g.beginPath();
+  g.arc(64, 64, 50, 0, Math.PI * 2);
+  g.fill();
+  g.fillStyle = '#fff';
+  g.font = 'bold 76px "Russo One", Arial, sans-serif';
+  g.textAlign = 'center';
+  g.textBaseline = 'middle';
+  g.fillText('!', 64, 68);
+  badgeTex = new THREE.CanvasTexture(c);
+  badgeTex.colorSpace = THREE.SRGBColorSpace;
+  return badgeTex;
+}
 import { skinMaterials } from './skins.js';
 
 export function textSprite(text, { bg = 'rgba(20,18,24,0.78)', fg = '#fff', size = 40, scale = 0.001 } = {}) {
@@ -62,7 +88,7 @@ function makeTags(root, name, label) {
         bubble = null;
       }
       if (text) {
-        bubble = new THREE.Sprite(new THREE.SpriteMaterial({ map: iconTexture('alert'), transparent: true, depthTest: false, sizeAttenuation: false }));
+        bubble = new THREE.Sprite(new THREE.SpriteMaterial({ map: alertTexture(), transparent: true, depthTest: false, sizeAttenuation: false }));
         bubble.scale.set(0.055, 0.055, 1);
         bubble.renderOrder = 11;
         root.add(bubble);
@@ -139,7 +165,7 @@ function makeBoxPerson(opts) {
     // cube head: face on the front (+z), hair on top and back
     faceMat = new THREE.MeshStandardMaterial({ map: faceTexture({ ...opts, skin, hair }), roughness: 0.8 });
     const h = sk?.head;
-    const mats = h ? [h.sides[0], h.sides[1], h.top, m.skin, h.front, h.back] : [m.skin, m.skin, m.hair, m.skin, faceMat, m.hair];
+    const mats = h ? [h.sides[0], h.sides[1], h.top, m.skin, mood ? faceMat : h.front, h.back] : [m.skin, m.skin, m.hair, m.skin, faceMat, m.hair];
     head = new THREE.Mesh(new THREE.BoxGeometry(0.32, 0.36, 0.3).translate(0, 0.2, 0), mats);
     rig.neck.add(head);
   }
@@ -188,8 +214,9 @@ function makeBoxPerson(opts) {
         head.material.map = moodTex[state];
         head.material.needsUpdate = true;
         head.scale.set(HH * f.aspect, HH, 1);
-        head.position.y = -0.1; // mood heads come with their own neck: sit it in the collar
-        rig.neckMesh.visible = false;
+        const neck = moodHasNeck(who); // with its own neck: sit it in the collar
+        head.position.y = neck ? -0.1 : -0.01;
+        rig.neckMesh.visible = !neck;
       } else {
         faceMat.map = moodTex[state];
         faceMat.needsUpdate = true;
@@ -257,7 +284,7 @@ function makeBoxPerson(opts) {
   };
 }
 
-export function makeCat() {
+export function makeCat({ label = true } = {}) {
   const root = new THREE.Group();
   const body = new THREE.Group();
   root.add(body);
@@ -268,12 +295,28 @@ export function makeCat() {
   const head = new THREE.Group();
   head.position.set(0, 0.26, 0.17);
   body.add(head);
-  head.add(new THREE.Mesh(new THREE.SphereGeometry(0.095, 14, 12).scale(1.1, 0.95, 0.85), fur));
+  const skull = new THREE.Group(); // drawn head, until his photo is ready
+  head.add(skull);
+  skull.add(new THREE.Mesh(new THREE.SphereGeometry(0.095, 14, 12).scale(1.1, 0.95, 0.85), fur));
   const eye = new THREE.MeshStandardMaterial({ color: '#f08a1c', emissive: '#7a3a00', emissiveIntensity: 0.6, roughness: 0.2 });
   for (const x of [-0.04, 0.04]) {
-    head.add(new THREE.Mesh(new THREE.ConeGeometry(0.022, 0.035, 4).translate(x * 1.4, 0.08, -0.01), dark)); // small Persian ears
-    head.add(new THREE.Mesh(new THREE.SphereGeometry(0.02, 10, 8).translate(x, 0.01, 0.075), eye));
-    head.add(new THREE.Mesh(new THREE.SphereGeometry(0.009, 6, 4).translate(x, 0.01, 0.092), mat('#050505')));
+    skull.add(new THREE.Mesh(new THREE.ConeGeometry(0.022, 0.035, 4).translate(x * 1.4, 0.08, -0.01), dark)); // small Persian ears
+    skull.add(new THREE.Mesh(new THREE.SphereGeometry(0.02, 10, 8).translate(x, 0.01, 0.075), eye));
+    skull.add(new THREE.Mesh(new THREE.SphereGeometry(0.009, 6, 4).translate(x, 0.01, 0.092), mat('#050505')));
+  }
+  // his real face (src/assets/faces/cat_default.png): a flat head that turns to the camera, like the guys
+  if (hasMoodFaces('cat')) {
+    moodFace('cat', 'default').then((f) => {
+      const tex = new THREE.CanvasTexture(f.canvas);
+      tex.colorSpace = THREE.SRGBColorSpace;
+      const face = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, transparent: true, alphaTest: 0.05 }));
+      const fh = 0.27;
+      face.scale.set(fh * f.aspect, fh, 1);
+      face.center.set(0.5, 0.35);
+      face.userData.catFace = true;
+      head.add(face);
+      skull.visible = false;
+    });
   }
   const legs = [];
   for (const [x, z] of [[-0.05, 0.1], [0.05, 0.1], [-0.05, -0.1], [0.05, -0.1]]) {
@@ -287,9 +330,11 @@ export function makeCat() {
   tail.rotation.x = -0.6;
   body.add(tail);
 
-  const tag = textSprite('Кот', { size: 34 });
-  tag.position.y = 0.6;
-  root.add(tag);
+  if (label) {
+    const tag = textSprite('Кот', { size: 34 });
+    tag.position.y = 0.6;
+    root.add(tag);
+  }
   let bubble = null, bubbleText = null;
   return {
     root,
@@ -301,17 +346,28 @@ export function makeCat() {
         bubble = null;
       }
       if (!text) return;
-      bubble = new THREE.Sprite(new THREE.SpriteMaterial({ map: iconTexture('alert'), transparent: true, depthTest: false, sizeAttenuation: false }));
+      bubble = new THREE.Sprite(new THREE.SpriteMaterial({ map: alertTexture(), transparent: true, depthTest: false, sizeAttenuation: false }));
       bubble.scale.set(0.05, 0.05, 1);
       bubble.renderOrder = 11;
       bubble.position.y = 0.85;
       root.add(bubble);
     },
-    animate(t, walking) {
-      const s = walking ? Math.sin(t * 14) * 0.5 : 0;
+    // play = { run, crouch (0..1, ready to pounce), pounce (0..1 through the jump), bat (0..1 paw swipe) }
+    animate(t, walking, play = {}) {
+      const { run = false, crouch = 0, pounce = 0, bat = 0 } = play;
+      const freq = run ? 24 : 14, amp = run ? 0.85 : 0.5;
+      const s = walking ? Math.sin(t * freq) * amp : 0;
       legs[0].rotation.x = legs[3].rotation.x = s;
       legs[1].rotation.x = legs[2].rotation.x = -s;
-      tail.rotation.z = Math.sin(t * 3) * 0.4;
+      // crouched low with the rear end wiggling, then the jump
+      const hop = Math.sin(Math.PI * pounce);
+      body.position.y = -0.05 * crouch + 0.22 * hop + (run && walking ? Math.abs(Math.sin(t * freq)) * 0.03 : 0);
+      body.rotation.x = 0.12 * crouch + (pounce > 0 ? (pounce - 0.5) * 0.7 : 0); // nose up on take-off, down on landing
+      body.rotation.z = crouch * Math.sin(t * 30) * 0.06;
+      if (pounce > 0) legs[0].rotation.x = legs[1].rotation.x = -1.1 * hop; // front paws out
+      if (bat > 0) legs[t % 2 < 1 ? 0 : 1].rotation.x = -1.6 * Math.sin(Math.PI * bat);
+      tail.rotation.z = Math.sin(t * (crouch > 0 || run ? 9 : 3)) * (crouch > 0 ? 0.25 : 0.4);
+      tail.rotation.x = run ? -1.1 : -0.6;
     },
   };
 }

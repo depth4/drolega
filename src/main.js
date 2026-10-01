@@ -45,6 +45,7 @@ const player = new Player(camera, [...apt.colliders, ...furn.colliders]);
 scene.add(camera); // the first-person hands hang off the camera
 const hands = createViewmodel(camera);
 let mirror = null; // created at boot, once the head style is known
+let phoneBob = 0;
 const fx = makeFX(renderer, scene, camera);
 const hud = createHUD({ onBuy: (id) => game.buy(id) });
 // close-up hands-on scenes (pelmeni): the mouse is free, the camera flies in, the world slows down
@@ -162,6 +163,13 @@ game.onEnd = (res) => {
 };
 
 $('btn-play').addEventListener('click', play);
+// any night straight from the menu, from its start
+for (const b of document.querySelectorAll('#night-pick [data-night]')) {
+  b.addEventListener('click', () => {
+    startNight(Number(b.dataset.night));
+    play();
+  });
+}
 $('btn-orbit').addEventListener('click', toOrbit);
 
 // character look: cube heads with photo faces, or Doom-style pixel sprites
@@ -285,8 +293,8 @@ addEventListener('keydown', (e) => {
   if (k === 'KeyC' && !phoneOpen) return setPhotoMode(!photoMode);
   if (photoMode && k === 'Escape') return setPhotoMode(false);
   if (k === 'KeyF') return setPhone(!phoneOpen);
-  if (phoneOpen && (k === 'ArrowLeft' || k === 'KeyA')) return hud.shopStep(-1);
-  if (phoneOpen && (k === 'ArrowRight' || k === 'KeyD')) return hud.shopStep(1);
+  if (phoneOpen && k === 'ArrowLeft') return hud.shopStep(-1);
+  if (phoneOpen && k === 'ArrowRight') return hud.shopStep(1);
   if (k === 'Escape') return phoneOpen ? setPhone(false) : pause();
   if (phoneOpen || game.oleg.blackout > 0 || game.talkLocked) return;
   if (k.startsWith('Digit')) {
@@ -385,7 +393,8 @@ function frame(now) {
         wasFocused = false;
         lock();
       }
-      player.update(dt, { drunk: game.oleg.drunk, canMove: !phoneOpen && !(game.oleg.blackout > 0) && !listening });
+      // the phone is in his hand: he can keep walking with it (WASD), the mouse is on the screen
+      player.update(dt, { drunk: game.oleg.drunk, canMove: !(game.oleg.blackout > 0) && !listening });
     }
     focusRay.setFromCamera(focusActive() ? mouseNdc : center, camera);
     game.cooking.update(dt, { ray: focusRay.ray, down: use.down, dx: use.fx, dy: use.fy });
@@ -394,13 +403,20 @@ function frame(now) {
     const k = player.keys;
     hands.update(dt, {
       item: game.inv.selectedItem(),
-      moving: !listening && !mini.active && !phoneOpen && ['KeyW', 'KeyA', 'KeyS', 'KeyD'].some((c) => k.has(c)),
+      moving: !listening && !mini.active && ['KeyW', 'KeyA', 'KeyS', 'KeyD'].some((c) => k.has(c)),
       speed: k.has('ShiftLeft') || k.has('ShiftRight') ? 1.5 : 1,
       drunk: game.oleg.drunk,
       visible: !phoneOpen && !mini.active && !photoMode && !(game.oleg.blackout > 0),
       yaw: player.yaw,
       pitch: player.pitch,
     });
+    // the phone sways in his hand as he walks
+    if (phoneOpen) {
+      const walking = ['KeyW', 'KeyA', 'KeyS', 'KeyD'].some((c) => k.has(c));
+      phoneBob += dt * (walking ? 8 : 1.5);
+      const bx = walking ? Math.cos(phoneBob) * 5 : 0, by = walking ? Math.abs(Math.sin(phoneBob)) * 8 : Math.sin(phoneBob) * 2;
+      $('phone').style.transform = `translate(${bx}px, ${by}px) rotate(${-3 + (walking ? Math.cos(phoneBob) * 1.2 : 0)}deg)`;
+    }
     mirror?.update(dt, { x: player.x, z: player.z, yaw: player.yaw, moving: ['KeyW', 'KeyA', 'KeyS', 'KeyD'].some((c) => k.has(c)), drunk: game.oleg.drunk, item: game.inv.selectedItem() });
     game.olegPos = [player.x, player.z];
     game.olegYaw = player.yaw;

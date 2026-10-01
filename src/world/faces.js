@@ -112,6 +112,8 @@ for (const [path, src] of Object.entries(FILES)) {
 }
 
 export const hasMoodFaces = (who) => !!STATES[who];
+// Qwen heads come with a neck (sunk into the collar); photo cut-outs end at the chin and sit on the body's neck
+export const moodHasNeck = (who) => who === 'kirill';
 // best available picture for this state: the state itself, else default, else null (use the old photo)
 export const moodState = (who, state) => (STATES[who]?.[state] ? state : STATES[who]?.default ? 'default' : null);
 
@@ -178,7 +180,7 @@ function cutOut(img) {
     }
     // soften the edge: a pixel touching the background gets half alpha
     const x = k % w, y = (k / w) | 0;
-    if ((x > 0 && seen[k - 1]) || (x < w - 1 && seen[k + 1]) || (y > 0 && seen[k - w]) || (y < h - 1 && seen[k + w])) d[k * 4 + 3] = 140;
+    if ((x > 0 && seen[k - 1]) || (x < w - 1 && seen[k + 1]) || (y > 0 && seen[k - w]) || (y < h - 1 && seen[k + w])) d[k * 4 + 3] = Math.min(d[k * 4 + 3], 140);
     if (x < x0) x0 = x;
     if (x > x1) x1 = x;
     if (y < y0) y0 = y;
