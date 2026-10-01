@@ -92,8 +92,8 @@ const PLAN_WALLS = [
 
   // stairwell landing outside the front door (visitors stand here, the door camera looks at it)
   { id: 'landing-far', ext: true, ...r(10.7, 10.9, 3.7, 6.3) },
-  { id: 'landing-n', ext: true, ...r(8.5, 10.9, 3.5, 3.7) },
-  { id: 'landing-s', ext: true, ...r(8.5, 10.9, 6.3, 6.5), openings: [{ at: [8.65, 10.55], bottom: 0, top: DOOR_H + 0.2 }] }, // to the stairs down (outside.js)
+  { id: 'landing-n', ext: true, ...r(8.5, 10.9, 3.5, 3.7), openings: [{ at: [8.65, 10.55], bottom: 0, top: DOOR_H + 0.2 }] }, // to the stairs down (outside.js)
+  { id: 'landing-s', ext: true, ...r(8.5, 10.9, 6.3, 6.5) },
   { id: 'landing-gap', ext: true, ...r(8.1, 8.5, 5.92, 6.5) },
 ];
 

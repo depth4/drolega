@@ -8,19 +8,17 @@ import { H, planToWorld as P, worldToPlan } from './layout.js';
 import { mat, boxGeo, worldUV } from './apartment.js';
 import * as T from './textures.js';
 
-// Khrushchevka stairwell, Oleg on the 2nd floor. Side view: his landing -> a flight down to the half
-// landing -> a flight back to the 1st-floor landing (right under his) -> a short flight down to the
-// entrance door. The flights zig-zag in two lanes, stacked over each other.
+// Khrushchevka stairwell, Oleg on the 2nd floor. Out of his door onto the landing, then towards the
+// front of the house: a flight down to the half landing, a flight back to the 1st-floor landing (right
+// under his), a short flight down to the entrance door, which is in the front wall — the same side as
+// the balcony. The flights zig-zag in two lanes, stacked over each other. The kiosk is right across.
 export const STREET = -4.0;
 const L1 = -2.8; // 1st floor landing
 const SX = [8.5, 10.7], LANE = 9.6; // stairwell inner x; lane A (x < LANE) and lane B
-const STRIP = [6.5, 7.0], FL = [7.0, 9.0], END = [9.0, 9.8]; // plan z: landing strip, flights, far end
-const EXIT = [END[0], END[1]]; // entrance door to the yard (plan z), in the east wall at the bottom
-// The yard wraps round the corner: out of the entrance on the east side, round to the front of the
-// building, under the balcony and the living room windows, where the kiosk stands (you see it from above).
-const EAST = { x0: 10.9, x1: 16, z0: -0.42, z1: 13 }; // strip along the stairwell side
-const FRONT = { x0: -3, x1: 16, z0: -14, z1: -0.42 }; // in front of the balcony
-const SHOP = { x0: 4, x1: 8.5, z0: -10.5, z1: -6.5, door: [5.7, 6.9] }; // door on the side facing the building
+const TOP = [3.0, 3.5], FL = [1.0, 3.0], END = [0.0, 1.0]; // plan z: by his landing, the flights, the front end
+const DOOR = [9.0, 10.2]; // the entrance door (plan x) in the front wall
+const FRONT = { x0: -3, x1: 16, z0: -14, z1: -0.42 }; // the yard in front of the house
+const SHOP = { x0: 6.5, x1: 11, z0: -10.5, z1: -6.5, door: [8.2, 9.4] }; // across the yard, door towards the house
 
 // plan-space box -> world mesh (y in meters, not scaled)
 function pbox(group, x0, x1, y0, y1, z0, z1, m, uv) {
@@ -45,23 +43,28 @@ export function buildOutside() {
   const railMat = mat('#2a2a2a', { metalness: 0.4, roughness: 0.6 });
 
   // ---- stairwell walls (from the street level up to the ceiling)
-  const sw = (x0, x1, z0, z1, y0 = STREET, extra = {}) => {
-    pbox(group, x0, x1, y0, Math.min(H, Math.max(y0, -1.1)), z0, z1, paintLow);
-    if (y0 < H) pbox(group, x0, x1, Math.max(y0, -1.1), H, z0, z1, paintHigh);
+  const sw = (x0, x1, z0, z1, extra = {}) => {
+    pbox(group, x0, x1, STREET, -1.1, z0, z1, paintLow);
+    pbox(group, x0, x1, -1.1, H, z0, z1, paintHigh);
     wall(x0, x1, z0, z1, extra);
   };
-  sw(8.3, 8.5, STRIP[0], 10.0); // west
-  sw(10.7, 10.9, STRIP[0], EXIT[0]); // east
-  sw(8.3, 10.9, END[1], 10.0); // far end
-  // the entrance door: a hole at the bottom only; above it the wall is solid (and solid for the upper levels)
-  pbox(group, 10.7, 10.9, STREET + 2.1, H, EXIT[0], EXIT[1], paintHigh);
-  wall(10.7, 10.9, EXIT[0], EXIT[1], { floor: [-3.4, 9] });
-  // the main entrance door leaf, open into the yard
-  pbox(group, 10.9, 11.0, STREET, STREET + 2.05, EXIT[0] - 0.75, EXIT[0], mat('#5a3a24'));
-  ceiling.add(pbox(new THREE.Group(), 8.3, 10.9, H, H + 0.15, STRIP[0], 10.0, mat('#bdb9ad')));
+  sw(10.7, 10.9, -0.42, TOP[1]); // the outer side wall
+  sw(8.3, 8.5, END[0], TOP[1]); // against the flat (its own wall starts at its floor)
+  // the front wall with the entrance door at the bottom
+  const facade = new THREE.MeshStandardMaterial({ map: T.concrete(), color: '#8f8a80', roughness: 1 });
+  for (const [x0, x1] of [[8.3, DOOR[0]], [DOOR[1], 10.9]]) {
+    pbox(group, x0, x1, STREET, H + 0.4, -0.42, 0, facade, 1);
+    wall(x0, x1, -0.42, 0);
+  }
+  pbox(group, DOOR[0], DOOR[1], STREET + 2.1, H + 0.4, -0.42, 0, facade, 1);
+  wall(DOOR[0], DOOR[1], -0.42, 0, { floor: [-3.4, 9] }); // a door only down at the street
+  pbox(group, DOOR[0] - 0.75, DOOR[0], STREET, STREET + 2.05, -0.55, -0.45, mat('#5a3a24')); // the door leaf, open out
+  pbox(group, DOOR[0] - 0.3, DOOR[1] + 0.3, STREET + 2.3, STREET + 2.4, -1.1, -0.42, mat('#5b5752')); // canopy
+  ceiling.add(pbox(new THREE.Group(), 8.3, 10.9, H, H + 0.15, -0.42, TOP[1], mat('#bdb9ad')));
 
   // ---- stairs: steps you see, a ramp the camera follows (heightAt)
   const lane = (a) => (a ? [SX[0], LANE - 0.05] : [LANE + 0.05, SX[1]]);
+  // from z0 (height y0) to z1 (height y1)
   const flight = (laneA, z0, z1, y0, y1, n) => {
     const [x0, x1] = lane(laneA);
     for (let k = 0; k < n; k++) {
@@ -71,17 +74,16 @@ export function buildOutside() {
     }
   };
   const slab = (z0, z1, y) => pbox(group, SX[0], SX[1], y - 0.25, y, z0, z1, concrete, 1);
-  slab(STRIP[0], STRIP[1], 0); // his landing, by the doorway
-  flight(true, FL[0], FL[1], 0, -1.4, 10); // down to the half landing
+  slab(TOP[0], TOP[1], 0); // his landing
+  flight(true, FL[1], FL[0], 0, -1.4, 10); // towards the front, down to the half landing
   slab(END[0], END[1], -1.4);
-  flight(false, FL[1], FL[0], -1.4, L1, 10); // back to the 1st floor
-  slab(STRIP[0], STRIP[1], L1);
-  flight(true, FL[0], FL[1], L1, STREET, 8); // the short one down to the door
+  flight(false, FL[0], FL[1], -1.4, L1, 10); // back to the 1st floor
+  slab(TOP[0], TOP[1], L1);
+  flight(true, FL[1], FL[0], L1, STREET, 8); // the short one down to the door
   pbox(group, SX[0], SX[1], STREET - 0.2, STREET, END[0], END[1], new THREE.MeshStandardMaterial({ map: T.floorTile(), roughness: 0.8 }), 1);
-  // the gap between the flights: a railing all the way down
   // balusters and a hand rail along each flight (the collider stops you hopping between flights)
   wall(LANE - 0.05, LANE + 0.05, FL[0], FL[1]);
-  for (const [y0, y1] of [[0, -1.4], [L1, -1.4], [L1, STREET]]) {
+  for (const [y0, y1] of [[-1.4, 0], [-1.4, L1], [STREET, L1]]) { // height at FL[0] .. at FL[1]
     const n = 9;
     for (let k = 0; k <= n; k++) {
       const z = FL[0] + ((FL[1] - FL[0]) * k) / n, y = y0 + ((y1 - y0) * k) / n;
@@ -94,53 +96,39 @@ export function buildOutside() {
     rail.lookAt(b2[0], y1 + 0.92, b2[1]);
     group.add(rail);
   }
-  // drops you can't walk off: his landing over the 2nd flight, the 1st-floor landing back into his doorway
-  wall(LANE, SX[1], FL[0] - 0.03, FL[0] + 0.03, { floor: [-0.7, 9] });
-  wall(SX[0], SX[1], 6.42, 6.55, { floor: [-9, -0.7] });
+  // drops you can't walk off: his landing over the 2nd flight; the 1st-floor landing back up into his doorway
+  wall(LANE, SX[1], FL[1] - 0.03, FL[1] + 0.03, { floor: [-0.7, 9] });
+  wall(SX[0], SX[1], 3.45, 3.56, { floor: [-9, -0.7] });
   // under the 2nd flight at the bottom: no headroom
-  wall(LANE, SX[1], STRIP[0], END[0], { floor: [-9, -3.4] });
-  // a doorway on the 1st floor (the neighbours below)
-  pbox(group, 10.72, 10.76, L1, L1 + 2.0, STRIP[0] - 0.05, STRIP[1] - 0.05, mat('#6a4a2e'));
-  // the building under the stairs so it doesn't float in the dollhouse view
-  pbox(group, 8.3, 10.9, -9, STREET - 0.2, STRIP[0], 10.0, mat('#3a3834'));
-  for (const [z, y] of [[9.4, -0.4], [6.75, L1 + 1.6]]) {
+  wall(LANE, SX[1], FL[0], TOP[1], { floor: [-9, -3.4] });
+  // the neighbours' door on the 1st floor
+  pbox(group, 10.66, 10.7, L1, L1 + 2.0, TOP[0] - 0.4, TOP[0] + 0.4, mat('#6a4a2e'));
+  // the building under the stairwell, so it doesn't float in the dollhouse view
+  pbox(group, 8.3, 10.9, -9, STREET - 0.2, -0.42, TOP[1], mat('#3a3834'));
+  for (const [z, y] of [[0.5, -0.4], [3.2, L1 + 1.6]]) {
     const l = new THREE.PointLight('#d8f0c8', 2.5, 7, 1.6);
     const [lx0, lz0] = P.pt(9.6, z);
     l.position.set(lx0, y, lz0);
     group.add(l);
   }
 
-  // ---- the yard (an L round the corner)
-  const asphalt = mat('#2b2c2e', { roughness: 1 });
-  const curb = mat('#55534f', { roughness: 1 });
-  for (const q of [EAST, FRONT]) pbox(group, q.x0, q.x1, STREET - 0.3, STREET, q.z0, q.z1, asphalt);
-  pbox(group, EAST.x0, 12.4, STREET, STREET + 0.06, EAST.z0, EAST.z1, curb); // sidewalks along the house
-  pbox(group, FRONT.x0, FRONT.x1, STREET, STREET + 0.06, -1.9, FRONT.z1, curb);
-  // the outside walls of the building at street level (the flat's own walls start at its floor)
-  const facade = new THREE.MeshStandardMaterial({ map: T.concrete(), color: '#8f8a80', roughness: 1 });
-  pbox(group, 10.9, 11.0, STREET, 0, EAST.z0, EXIT[0], facade, 1);
-  pbox(group, 10.9, 11.0, STREET, 0, EXIT[1], EAST.z1, facade, 1);
-  pbox(group, 10.9, 11.0, 0, H + 0.4, 10.0, EAST.z1, facade, 1);
-  wall(10.9, 11.0, EAST.z0, EXIT[0]);
-  wall(10.9, 11.0, EXIT[1], EAST.z1);
-  pbox(group, -0.4, 10.9, STREET, -0.25, -0.5, -0.42, facade, 1); // under the front windows
-  wall(-0.4, 10.9, -0.5, -0.42);
-  // a canopy over the entrance
-  pbox(group, 11.0, 11.7, STREET + 2.3, STREET + 2.4, EXIT[0] - 0.3, EXIT[1] + 0.3, mat('#5b5752'));
-  // fences round the yard
+  // ---- the yard in front of the house
+  pbox(group, FRONT.x0, FRONT.x1, STREET - 0.3, STREET, FRONT.z0, FRONT.z1, mat('#2b2c2e', { roughness: 1 }));
+  pbox(group, FRONT.x0, FRONT.x1, STREET, STREET + 0.06, -1.9, FRONT.z1, mat('#55534f', { roughness: 1 })); // sidewalk
+  pbox(group, -0.4, 8.3, STREET, -0.25, -0.5, -0.42, facade, 1); // the house below the flat's windows
+  wall(-0.4, 8.3, -0.5, -0.42);
   const fence = mat('#3b4a3a', { metalness: 0.3 });
   for (const [x0, x1, z0, z1] of [
-    [FRONT.x0, FRONT.x1, FRONT.z0 - 0.1, FRONT.z0], // far side
-    [FRONT.x0 - 0.1, FRONT.x0, FRONT.z0, FRONT.z1], // west end
-    [FRONT.x0, -0.4, FRONT.z1 - 0.1, FRONT.z1 + 0.05], // round the west corner
-    [EAST.x1, EAST.x1 + 0.1, FRONT.z0, EAST.z1], // east side
-    [EAST.x0, EAST.x1, EAST.z1, EAST.z1 + 0.1], // the back
+    [FRONT.x0, FRONT.x1, FRONT.z0 - 0.1, FRONT.z0],
+    [FRONT.x0 - 0.1, FRONT.x0, FRONT.z0, FRONT.z1],
+    [FRONT.x1, FRONT.x1 + 0.1, FRONT.z0, FRONT.z1],
+    [FRONT.x0, -0.4, FRONT.z1 - 0.08, FRONT.z1 + 0.05],
+    [10.9, FRONT.x1, FRONT.z1 - 0.08, FRONT.z1 + 0.05],
   ]) {
     pbox(group, x0, x1, STREET, STREET + 1.1, z0, z1, fence);
     wall(x0, x1, z0, z1);
   }
-  // street lamps: one by the entrance, two in front, so the kiosk is lit from the balcony
-  for (const [x, z] of [[13.2, 5], [2, -3.2], [10, -3.2]]) {
+  for (const [x, z] of [[2, -3.2], [12.5, -3.2]]) {
     pbox(group, x - 0.06, x + 0.06, STREET, STREET + 4.2, z - 0.06, z + 0.06, railMat);
     pbox(group, x - 0.25, x + 0.25, STREET + 4.1, STREET + 4.25, z - 0.15, z + 0.15, new THREE.MeshBasicMaterial({ color: '#ffd59a' }));
     const l = new THREE.PointLight('#ffb866', 7, 14, 1.4);
@@ -148,20 +136,18 @@ export function buildOutside() {
     l.position.set(wx, STREET + 4, wz);
     group.add(l);
   }
-  // a Zhiguli parked in front
   const car = mat('#7a2d22', { roughness: 0.5, metalness: 0.2 });
-  pbox(group, 11.2, 12.5, STREET + 0.25, STREET + 0.95, -9, -5.4, car);
-  pbox(group, 11.3, 12.4, STREET + 0.95, STREET + 1.45, -8.1, -6.4, car);
-  pbox(group, 11.25, 12.45, STREET + 1.0, STREET + 1.4, -8.05, -6.45, new THREE.MeshStandardMaterial({ color: '#1d2a33', roughness: 0.1 }));
-  for (const [x, z] of [[11.2, -8.4], [12.5, -8.4], [11.2, -6.0], [12.5, -6.0]]) pbox(group, x - 0.08, x + 0.08, STREET, STREET + 0.45, z - 0.3, z + 0.3, mat('#111'));
-  wall(11.2, 12.5, -9, -5.4);
-  // a bench and the trash bins, for the yard feel
-  pbox(group, 1.5, 3.2, STREET + 0.4, STREET + 0.48, -6.2, -5.8, mat('#6b4a2c'));
-  pbox(group, 13.6, 14.4, STREET, STREET + 1.1, 9, 10.5, mat('#3d5a3a'));
-  wall(13.6, 14.4, 9, 10.5);
+  pbox(group, 1.2, 2.5, STREET + 0.25, STREET + 0.95, -10, -6.4, car);
+  pbox(group, 1.3, 2.4, STREET + 0.95, STREET + 1.45, -9.1, -7.4, car);
+  pbox(group, 1.25, 2.45, STREET + 1.0, STREET + 1.4, -9.05, -7.45, new THREE.MeshStandardMaterial({ color: '#1d2a33', roughness: 0.1 }));
+  for (const [x, z] of [[1.2, -9.4], [2.5, -9.4], [1.2, -7.0], [2.5, -7.0]]) pbox(group, x - 0.08, x + 0.08, STREET, STREET + 0.45, z - 0.3, z + 0.3, mat('#111'));
+  wall(1.2, 2.5, -10, -6.4);
+  pbox(group, 3.5, 5.2, STREET + 0.4, STREET + 0.48, -4.2, -3.8, mat('#6b4a2c')); // bench
+  pbox(group, 13.5, 14.3, STREET, STREET + 1.1, -3, -1.6, mat('#3d5a3a')); // trash bins
+  wall(13.5, 14.3, -3, -1.6);
 
-  // ---- the kiosk "Продукты 24" (door towards the building)
-  const S = SHOP;
+  // ---- the kiosk "Продукты 24" (door towards the house)
+  const S = SHOP, cx = (S.x0 + S.x1) / 2;
   const kiosk = mat('#d9d4c7', { roughness: 0.9 });
   const kw = (x0, x1, z0, z1) => {
     pbox(group, x0, x1, STREET, STREET + 2.6, z0, z1, kiosk);
@@ -175,7 +161,6 @@ export function buildOutside() {
   kw(S.x1 - 0.15, S.x1, S.z0, S.z1);
   pbox(group, S.x0, S.x1, STREET + 2.6, STREET + 2.75, S.z0, S.z1, mat('#5a5650'));
   pbox(group, S.x0 + 0.15, S.x1 - 0.15, STREET, STREET + 0.01, S.z0 + 0.15, S.z1 - 0.15, new THREE.MeshStandardMaterial({ map: T.floorTile(), roughness: 0.8 }), 1);
-  // the glowing sign over the door, and one on the roof you can read from the balcony
   const sign = document.createElement('canvas');
   sign.width = 512;
   sign.height = 96;
@@ -196,19 +181,18 @@ export function buildOutside() {
   front.lookAt(sx, STREET + 2.35, sz + 5);
   group.add(front);
   const roof = new THREE.Mesh(new THREE.PlaneGeometry(P.len(3.4), 0.8), signMat);
-  const [rx, rz] = P.pt((S.x0 + S.x1) / 2, S.z1 - 0.3);
+  const [rx, rz] = P.pt(cx, S.z1 - 0.3);
   roof.position.set(rx, STREET + 3.25, rz);
   roof.lookAt(rx, STREET + 3.9, rz + 5); // tipped up towards the windows
   group.add(roof);
   const shopLight = new THREE.PointLight('#f4f8ff', 6, 10, 1.2);
-  const [lx, lz] = P.pt((S.x0 + S.x1) / 2, (S.z0 + S.z1) / 2);
+  const [lx, lz] = P.pt(cx, (S.z0 + S.z1) / 2);
   shopLight.position.set(lx, STREET + 2.3, lz);
   group.add(shopLight);
   // counter across the back, the cashier behind it
-  pbox(group, 4.6, 7.9, STREET, STREET + 1.0, -9.5, -9.1, mat('#7a5a3a'));
-  pbox(group, 4.55, 7.95, STREET + 1.0, STREET + 1.05, -9.55, -9.05, mat('#c9b48a'));
-  wall(4.6, 7.9, -9.5, -9.1);
-  // shelves: one product each; the products are boxes in the item's colours
+  pbox(group, S.x0 + 0.6, S.x1 - 0.6, STREET, STREET + 1.0, S.z0 + 1.0, S.z0 + 1.4, mat('#7a5a3a'));
+  pbox(group, S.x0 + 0.55, S.x1 - 0.55, STREET + 1.0, STREET + 1.05, S.z0 + 0.95, S.z0 + 1.45, mat('#c9b48a'));
+  wall(S.x0 + 0.6, S.x1 - 0.6, S.z0 + 1.0, S.z0 + 1.4);
   const shelves = [];
   const shelf = (id, x0, x1, z0, z1, color, label) => {
     const unit = pbox(group, x0, x1, STREET, STREET + 1.9, z0, z1, mat('#6b6156'));
@@ -228,41 +212,41 @@ export function buildOutside() {
     group.add(goods);
     shelves.push({ id, label, mesh: unit, goods });
   };
-  shelf('beer', 4.15, 4.55, -8.7, -7.85, '#3c6e2d', 'Пиво');
-  shelf('vodka', 4.15, 4.55, -7.8, -6.95, '#dfe9ee', 'Водка');
-  shelf('pelmeni', 7.95, 8.35, -8.7, -7.85, '#e8eef8', 'Пельмени');
-  shelf('chips', 7.95, 8.35, -7.8, -6.95, '#e0a21b', 'Сухарики');
+  const zm = S.z0 + 2.65; // shelves along the side walls, by the door half
+  shelf('beer', S.x0 + 0.15, S.x0 + 0.55, zm - 0.85, zm, '#3c6e2d', 'Пиво');
+  shelf('vodka', S.x0 + 0.15, S.x0 + 0.55, zm, zm + 0.85, '#dfe9ee', 'Водка');
+  shelf('pelmeni', S.x1 - 0.55, S.x1 - 0.15, zm - 0.85, zm, '#e8eef8', 'Пельмени');
+  shelf('chips', S.x1 - 0.55, S.x1 - 0.15, zm, zm + 0.85, '#e0a21b', 'Сухарики');
   // behind the cashier: the wall of cigarettes, bottles and everything
-  pbox(group, 4.3, 8.2, STREET, STREET + 2.2, -10.35, -9.95, mat('#5e544a'));
+  pbox(group, S.x0 + 0.3, S.x1 - 0.3, STREET, STREET + 2.2, S.z0 + 0.15, S.z0 + 0.55, mat('#5e544a'));
   const backGoods = ['#b3242a', '#e8e0c8', '#2f5fb8', '#3c6e2d', '#e0a21b', '#7a3a8a', '#dfe9ee'];
   for (let row = 0; row < 5; row++) {
     for (let k = 0; k < 13; k++) {
-      const x = 4.45 + k * 0.28, bottle = row < 2;
-      const [bx, bz] = P.pt(x, -9.92);
+      const x = S.x0 + 0.45 + k * 0.28, bottle = row < 2;
+      const [bx, bz] = P.pt(x, S.z0 + 0.58);
       const m = bottle
         ? new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.04, 0.3, 8), mat(backGoods[(k + row * 3) % backGoods.length], { roughness: 0.2 }))
         : new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.12, 0.06), mat(backGoods[(k * 2 + row) % backGoods.length]));
       m.position.set(bx, STREET + 0.45 + row * 0.38 + (bottle ? 0.15 : 0.06), bz);
       group.add(m);
     }
-    pbox(group, 4.3, 8.2, STREET + 0.4 + row * 0.38, STREET + 0.43 + row * 0.38, -10.35, -9.8, mat('#4a4038'));
+    pbox(group, S.x0 + 0.3, S.x1 - 0.3, STREET + 0.4 + row * 0.38, STREET + 0.43 + row * 0.38, S.z0 + 0.15, S.z0 + 0.7, mat('#4a4038'));
   }
-  // the door you can't walk out of with unpaid stuff (shop.js turns it on)
   const shopDoor = { ...P.rect(S.door[0], S.door[1], S.z1 - 0.2, S.z1 + 0.05), enabled: false };
   colliders.push(shopDoor);
-  const cashier = P.pt(6.25, -9.75);
+  const cashier = P.pt(cx, S.z0 + 0.75);
 
   // where Oleg's feet are. In the stairwell several floors are stacked over the same spot: take the one
   // closest to where his feet already are (you can only get to a level by walking onto it)
   function heightAt(x, z, cur = 0) {
     const [px, pz] = worldToPlan(x, z);
     const onBalcony = px > 2.3 && px < 5.6 && pz > -1.3 && pz < -0.42; // the balcony is the flat's floor
-    if (px > EAST.x0 || (pz < FRONT.z1 && !onBalcony)) return STREET;
-    if (px < SX[0] - 0.2 || px > SX[1] + 0.25 || pz < STRIP[0]) return 0;
-    const t = (pz - FL[0]) / (FL[1] - FL[0]);
+    if (pz < FRONT.z1 && !onBalcony) return STREET;
+    if (px < SX[0] - 0.2 || px > SX[1] + 0.25 || pz >= TOP[1] || pz < -0.42) return 0;
+    const t = (FL[1] - pz) / (FL[1] - FL[0]); // 0 by his landing .. 1 at the front end
     let cands;
-    if (pz < STRIP[1]) cands = [0, L1];
-    else if (pz >= END[0]) cands = [-1.4, STREET];
+    if (pz >= TOP[0]) cands = [0, L1];
+    else if (pz < END[1]) cands = [-1.4, STREET];
     else if (px < LANE) cands = [-1.4 * t, L1 + (STREET - L1) * t];
     else cands = [L1 + 1.4 * t];
     return cands.reduce((b, h) => (Math.abs(h - cur) < Math.abs(b - cur) ? h : b));
@@ -271,8 +255,8 @@ export function buildOutside() {
   function zoneName(x, z) {
     const [px, pz] = worldToPlan(x, z);
     if (px > S.x0 && px < S.x1 && pz > S.z0 && pz < S.z1) return 'Продукты 24';
-    if (px > EAST.x0 || (pz < -1.3)) return 'Двор';
-    if (px >= SX[0] - 0.2 && px <= SX[1] + 0.25 && pz >= STRIP[0]) return 'Подъезд';
+    if (pz < -1.3 || (pz < FRONT.z1 && !(px > 2.3 && px < 5.6))) return 'Двор';
+    if (px >= SX[0] - 0.2 && px <= SX[1] + 0.25 && pz >= -0.42 && pz < TOP[1]) return 'Подъезд';
     return null;
   }
 
