@@ -34,7 +34,7 @@ export const TUNE = {
   fun: {
     boredom: 0.5, // everyone loses this much fun per second (x night pace)
     music: 0.7, // bonus in the living room while music plays
-    olegBoredom: 0.8, // Oleg gets bored fast on his own: he has to party, not just clean up
+    olegBoredom: 0.6, // Oleg gets bored fast on his own: he has to party, not just clean up
     helpBonus: 8, // Oleg's fun for solving someone's problem
   },
 
@@ -89,7 +89,7 @@ export const TUNE = {
   // partying with the guys: Oleg near friends (within near m, same room) gets withFriends fun per friend
   // per second and each of them hostBonus; away from everyone longer than missAfter s and they miss him
   // (missDrain each); a drink next to them = cheers (cheers fun for all); T = dance (dance s, needs music)
-  vibe: { near: 3.5, withFriends: 0.3, hostBonus: 0.35, missAfter: 25, missDrain: 0.4, cheers: 6, cheersCd: 12, dance: 5, danceFun: 8, danceCost: 8 },
+  vibe: { near: 3.5, withFriends: 0.35, hostBonus: 0.35, missAfter: 25, missDrain: 0.4, cheers: 6, cheersCd: 12, dance: 5, danceFun: 8, danceCost: 8 },
 
   // drunk physics: bodies push each other apart; running into a drunk guy knocks him over (knockOver:
   // speed/5 x (0.35 + drunk) above it); two drunks (drunk sum > bumpDrunk) bumping may fall (bumpFall);
