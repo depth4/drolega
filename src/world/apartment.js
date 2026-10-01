@@ -49,7 +49,8 @@ export function buildApartment() {
 
   // --- base slab (thresholds under door openings)
   const B = BOUNDS;
-  group.add(new THREE.Mesh(boxGeo(B.x0, B.x1, -0.25, 0, B.z0, B.z1), mat('#4a3f36')));
+  // 1 cm in from the stairwell side: a face in the stairwell wall's plane flickers in a stripe along the stairs
+  group.add(new THREE.Mesh(boxGeo(B.x0 + 0.01, B.x1, -0.25, 0, B.z0, B.z1), mat('#4a3f36')));
 
   // --- floors
   const floorMats = {
@@ -200,7 +201,7 @@ export function buildApartment() {
     // the rest of the building under the flat, so it doesn't float in the dollhouse view
     const mass = mat('#3a3834');
     // its stairwell side stays behind the stairwell's own wall: two faces in one plane flicker in stripes
-    group.add(new THREE.Mesh(boxGeo(B.x0 + 0.3, B.x1, -9, -0.25, B.z0, B.z1), mass));
+    group.add(new THREE.Mesh(boxGeo(B.x0 + 0.01, B.x1, -9, -0.25, B.z0, B.z1), mass));
     buildFacade(group, ceiling);
     // stairwell landing slab + mass (the landing is on the entrance side)
     const land = ROOMS.find((r) => r.id === 'landing').rects[0];

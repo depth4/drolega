@@ -64,7 +64,7 @@ export function buildOutside() {
   wall(DOOR[0], DOOR[1], -0.42, 0, { floor: [-3.4, 9] }); // a door only down at the street
   pbox(group, DOOR[0] - 0.75, DOOR[0], STREET, STREET + 2.05, -0.55, -0.45, mat('#5a3a24')); // the door leaf, open out
   pbox(group, DOOR[0] - 0.3, DOOR[1] + 0.3, STREET + 2.3, STREET + 2.4, -1.1, -0.42, mat('#5b5752')); // canopy
-  ceiling.add(pbox(new THREE.Group(), 8.5, 10.9, H, H + 0.15, -0.42, TOP[1], mat('#bdb9ad')));
+  ceiling.add(pbox(new THREE.Group(), 8.5, 10.9, H, H + 0.15, 0, TOP[1], mat('#bdb9ad'))); // behind the front wall, not in its face
 
   // ---- stairs: steps you see, a ramp the camera follows (heightAt)
   // steps and slabs go 3 cm into the side walls: an end face lying exactly on a wall face flickers in stripes
