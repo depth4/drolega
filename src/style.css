@@ -235,7 +235,10 @@ h1 span { display: block; margin-top: 8px; font-size: 0.42em; letter-spacing: 0.
 .controls div { display: flex; gap: 10px; min-width: 0; }
 .controls dt { font: 700 12px var(--mono); color: var(--lamp); min-width: 70px; white-space: nowrap; }
 .controls dd { margin: 0; color: var(--ink-dim); }
-.stats { margin: 0; font: 14px var(--mono); color: var(--ink-dim); line-height: 1.7; }
+.stats { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; }
+.stats div { display: grid; gap: 2px; padding: 10px 12px; border-radius: 12px; background: rgba(239, 230, 212, 0.05); border: 1px solid var(--line); }
+.stats b { font: 700 22px var(--mono); color: var(--lamp); }
+.stats span { font-size: 12.5px; color: var(--ink-dim); }
 
 #orbit-bar {
   position: fixed; top: calc(12px + env(safe-area-inset-top, 0px)); left: 16px; right: 16px;
@@ -267,6 +270,11 @@ h1 span { display: block; margin-top: 8px; font-size: 0.42em; letter-spacing: 0.
 .end-photos img { width: 100%; display: block; }
 .end-photos figcaption { font: 13px var(--display); color: #1b1612; text-align: center; padding-top: 4px; }
 
+.confetti { position: fixed; top: -20px; width: 8px; height: 14px; border-radius: 2px; pointer-events: none; animation: confetti linear infinite; z-index: 0; }
+#end .menu-card { position: relative; z-index: 1; }
+@keyframes confetti { to { transform: translate(var(--x), 110vh) rotate(var(--r)); } }
+
 @media (prefers-reduced-motion: reduce) {
+  .confetti { display: none; }
   .mate.bad .badge, .oleg-name em, .door-alert, .bar.low, .courier-chip.here, .menu-card, .toast { animation: none; }
 }

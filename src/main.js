@@ -179,12 +179,30 @@ game.onEnd = (res) => {
   $('end-night').textContent = `Ночь ${res.night} из ${TUNE.nights}`;
   $('end-title').textContent = last ? BIRTHDAY.title : res.win ? 'Пережил ночь!' : 'Провал';
   $('end-reason').textContent = last ? BIRTHDAY.lines.join(' ') : res.reason;
-  $('end-stats').innerHTML = `Помог пацанам: ${st.stats.helped} раз<br>Потрачено на доставку: ${st.stats.spent} ₽ · на взятки: ${st.stats.bribes} ₽<br>Осталось денег: ${st.money} ₽ · хата: ${Math.round(st.hut)}%`;
+  const tile = (v, label) => `<div><b>${v}</b><span>${label}</span></div>`;
+  $('end-stats').innerHTML = [
+    tile(st.stats.helped, 'раз помог пацанам'),
+    tile(`${Math.round(st.hut)}%`, 'осталось от хаты'),
+    tile(`${st.stats.spent} ₽`, 'на доставку'),
+    tile(`${st.stats.bribes} ₽`, 'на взятки соседям'),
+    tile(`${st.money} ₽`, 'осталось денег'),
+  ].join('');
   $('end-photos').innerHTML = st.photos
     .map((p, i) => `<figure style="--r:${(i % 2 ? 1 : -1) * (2 + i)}deg"><img src="${p.img}" alt=""><figcaption>${p.caption}</figcaption></figure>`)
     .join('');
   $('btn-next').textContent = last ? 'Сначала' : res.win ? `Ночь ${res.night + 1}` : 'Ещё раз';
   if (last) game.night = 0;
+  // the birthday screen gets confetti
+  $('end').querySelectorAll('.confetti').forEach((c) => c.remove());
+  if (last) {
+    const colors = ['#f2b33d', '#ff5a4f', '#7fd48a', '#5fb7a5', '#9b86e0', '#f1e8d6'];
+    for (let i = 0; i < 70; i++) {
+      const c = document.createElement('i');
+      c.className = 'confetti';
+      c.style.cssText = `left:${Math.random() * 100}%;background:${colors[i % colors.length]};animation-delay:${-Math.random() * 6}s;animation-duration:${4 + Math.random() * 4}s;--x:${(Math.random() - 0.5) * 160}px;--r:${Math.random() * 720}deg`;
+      $('end').appendChild(c);
+    }
+  }
   show('end', true);
 };
 
