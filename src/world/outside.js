@@ -139,6 +139,9 @@ export function buildOutside() {
     const [wx, wz] = P.pt(x, z);
     l.position.set(wx, STREET + 4, wz);
     group.add(l);
+    const halo = T.glowSprite('#ffc27a', 1.6);
+    halo.position.set(wx, STREET + 4.05, wz);
+    group.add(halo);
   }
   const car = mat('#7a2d22', { roughness: 0.5, metalness: 0.2 });
   pbox(group, 1.2, 2.5, STREET + 0.25, STREET + 0.95, -10, -6.4, car);

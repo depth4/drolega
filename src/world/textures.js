@@ -232,3 +232,22 @@ export const cityFacade = () =>
         g.fillRect(i * cw + cw * 0.25, j * rh + rh * 0.3, cw * 0.5, rh * 0.45);
       }
   }, false);
+
+// Soft round glow around a bulb (additive sprite)
+export const glow = () =>
+  make('glow', 128, 128, (g, w) => {
+    const r = g.createRadialGradient(w / 2, w / 2, 0, w / 2, w / 2, w / 2);
+    r.addColorStop(0, 'rgba(255,255,255,0.9)');
+    r.addColorStop(0.15, 'rgba(255,255,255,0.45)');
+    r.addColorStop(0.45, 'rgba(255,255,255,0.1)');
+    r.addColorStop(1, 'rgba(255,255,255,0)');
+    g.fillStyle = r;
+    g.fillRect(0, 0, w, w);
+  }, false);
+
+// a glow sprite for a lamp: cheap, no light, just reads as "this bulb is on"
+export function glowSprite(color, size) {
+  const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: glow(), color, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, opacity: 0.55 }));
+  s.scale.setScalar(size);
+  return s;
+}

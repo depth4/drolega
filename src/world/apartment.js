@@ -169,6 +169,9 @@ export function buildApartment() {
     light.position.set(x, H - 0.45, z);
     group.add(light);
     lights.push(light);
+    const halo = T.glowSprite(room.lampColor ?? '#ffd7a0', room.chandelier ? 0.9 : 0.6);
+    halo.position.set(x, H - (room.chandelier ? 0.55 : 0.43), z);
+    group.add(halo);
     if (room.chandelier) continue; // built in furniture.js
     const cord = new THREE.Mesh(new THREE.CylinderGeometry(0.006, 0.006, 0.3), mat('#222'));
     cord.position.set(x, H - 0.15, z);
