@@ -39,8 +39,10 @@ export class Player {
   }
 
   // a collider we are already inside (a door closed on us) never traps us: we can always walk out
+  // `floor: [lo, hi]` on a collider = it only exists at those floor heights (the stairwell's stacked flights)
   blocked(x, z) {
-    return this.colliders.some((c) => c.enabled !== false && Player.hits(c, x, z) && !Player.hits(c, this.x, this.z));
+    const f = this.floorY ?? 0;
+    return this.colliders.some((c) => c.enabled !== false && (!c.floor || (f >= c.floor[0] && f <= c.floor[1])) && Player.hits(c, x, z) && !Player.hits(c, this.x, this.z));
   }
 
   // fall: 0 standing .. 1 lying on the floor (Oleg tripped / slipped)
@@ -70,7 +72,7 @@ export class Player {
     }
     // dancing: bouncing to the beat, head going side to side
     // stairs: the floor under his feet (outside.js), followed smoothly
-    const floor = this.floorAt ? this.floorAt(this.x, this.z) : 0;
+    const floor = this.floorAt ? this.floorAt(this.x, this.z, this.floorY ?? 0) : 0;
     this.floorY = this.floorY === undefined ? floor : this.floorY + (floor - this.floorY) * Math.min(1, dt * 12);
     const bob = (moving ? Math.sin(this.walkT * 8) * 0.03 : 0) + (dance > 0 ? Math.abs(Math.sin(this.t * 5.2)) * 0.09 : 0);
     const groove = dance > 0 ? Math.sin(this.t * 2.6) * 0.12 : 0;

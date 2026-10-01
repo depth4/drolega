@@ -523,7 +523,9 @@ export class Friend extends Walker {
     const jig = this.shake * Math.sin(this.t * 45) * 0.06; // being shaken awake
     this.applyTransform(Math.cos(this.heading) * (lat + jig), -Math.sin(this.heading) * (lat + jig), walk ? 0.35 * d * Math.sin(this.t * 2.1 + this.seed) : 0);
     const talking = this.game.talk?.friend === this; // stands still while telling his story
-    this.figure.update(dt, { walking: walk && !(this.lurch > 0) && !talking, speed: this.speed, drunk: d, music: this.game.state.music });
+    this.balanceTick(dt);
+    const b = this.bal;
+    this.figure.update(dt, { walking: walk && !(this.lurch > 0) && !talking, speed: this.speed, drunk: d, music: this.game.state.music, bal: b && { p: b.p, r: b.r, m: Math.hypot(b.p, b.r) } });
   }
 
   get statusText() {
@@ -672,6 +674,62 @@ export class Friend extends Walker {
     this.walkingNow = true;
   }
 
+  // ---- balance: an inverted pendulum on his feet (TUNE.balance) ----
+  balanceTick(dt) {
+    const B = TUNE.balance, g = this.game;
+    const b = (this.bal ??= { p: 0, r: 0, vp: 0, vr: 0 });
+    if (this.fallen || this.figure.pose !== 'stand' || !this.figure.setLean) {
+      b.p = b.r = b.vp = b.vr = 0;
+      return;
+    }
+    const d = this.drunk / 100, sdt = Math.min(dt, 1 / 30);
+    // drunk: the floor won't stay still (more so on the move)
+    const n = B.noise * (0.35 * d + 0.65 * d * d) * (this.mode === 'walk' ? 1.5 : 0.8) * Math.sqrt(sdt);
+    b.vp += (Math.random() - 0.5) * 2 * n;
+    b.vr += (Math.random() - 0.5) * 2 * n;
+    // gravity tips him further, his muscles pull him back up (weaker when drunk)
+    const kp = B.kp * (1 - 0.6 * d), kd = B.kd * (1 - 0.4 * d);
+    b.vp += (B.g * Math.sin(b.p) - kp * b.p - kd * b.vp) * sdt;
+    b.vr += (B.g * Math.sin(b.r) - kp * b.r - kd * b.vr) * sdt;
+    b.p += b.vp * sdt;
+    b.r += b.vr * sdt;
+    const m = Math.hypot(b.p, b.r);
+    const dir = this.heading + Math.atan2(-b.r, b.p); // which way he's tipping, in the world
+    this.stepCd = (this.stepCd ?? 0) - dt;
+    if (m > B.fallAt) {
+      b.p = b.r = b.vp = b.vr = 0;
+      this.figure.setLean(0, 0);
+      this.fall(dir, this.lastPush ?? 'drunk');
+      return;
+    }
+    // too far: catch himself with a step that way
+    if (m > B.stepAt && this.stepCd <= 0) {
+      this.stepCd = 0.3;
+      const nx = this.pos[0] + Math.sin(dir) * B.stepLen, nz = this.pos[1] + Math.cos(dir) * B.stepLen;
+      if (!g.bodyBlocked(nx, nz)) {
+        this.pos = [nx, nz];
+        // sober, a step kills the momentum; drunk, he stumbles on with it
+        const keepA = 0.45 + 0.35 * d, keepV = 0.35 + 0.55 * d;
+        b.p *= keepA;
+        b.r *= keepA;
+        b.vp *= keepV;
+        b.vr *= keepV;
+      }
+      if (m > B.stepAt * 1.8 && Math.random() < 0.4) this.figure.say(['Опа-опа', 'Воу-воу', 'Стоять!', 'Держусь'][Math.floor(Math.random() * 4)], 1.2);
+    }
+    if (m < 0.05) this.lastPush = null;
+    this.figure.setLean(b.p, b.r);
+  }
+
+  // a kick to his balance: dir = where it pushes him (world), strength in rad/s
+  push(dir, strength, why = 'shove') {
+    const b = (this.bal ??= { p: 0, r: 0, vp: 0, vr: 0 });
+    const rel = dir - this.heading;
+    b.vp += Math.cos(rel) * strength;
+    b.vr += -Math.sin(rel) * strength;
+    this.lastPush = why;
+  }
+
   // knocked over, slipped, or just too drunk: tips over around his feet, lies there, gets up
   fall(dir = this.heading, why = 'drunk') {
     if (this.fallen || this.figure.pose !== 'stand' || this.follow) return false;
@@ -712,7 +770,8 @@ export class Friend extends Walker {
     for (const pd of g.puddles) {
       if (Math.hypot(pd.position.x - this.pos[0], pd.position.z - this.pos[1]) > 0.35) continue;
       this.slipCd = g.state.t + 6;
-      if (Math.random() < TUNE.chaos.slip + this.drunk / 200 && this.fall(this.heading, 'slip')) this.figure.say('Кто тут наблевал, бля?!', 2.2);
+      this.push(this.heading + Math.PI + rand(-0.6, 0.6), 1.6 + 2 * (this.drunk / 100), 'slip');
+      this.figure.say('Кто тут наблевал, бля?!', 2.2);
       return;
     }
   }
@@ -765,9 +824,9 @@ export class Friend extends Walker {
       if (this.lurch > 0) this.lurch -= dt;
       else if (d > 0.4 && chance(0.12 * d, dt)) {
         this.lurch = 0.8;
-        // very drunk: a stumble can end on the floor
-        if (d > 0.7 && Math.random() < 0.35) this.fall(this.heading + rand(-1, 1), 'drunk');
-        else this.figure.play('stumble');
+        // a stumble: a kick forward-ish; whether he stays up is up to his balance
+        this.figure.play('stumble');
+        this.push(this.heading + rand(-0.8, 0.8), 0.6 + 1.2 * d, 'drunk');
       } else {
         this.stepWalk(dt * (1 - 0.35 * d * (0.5 + 0.5 * Math.sin(this.t * 1.9))));
         this.slipCheck();

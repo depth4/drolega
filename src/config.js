@@ -91,6 +91,11 @@ export const TUNE = {
   // (missDrain each); a drink next to them = cheers (cheers fun for all); T = dance (dance s, needs music)
   vibe: { near: 3.5, withFriends: 0.35, hostBonus: 0.35, missAfter: 25, missDrain: 0.4, cheers: 6, cheersCd: 12, dance: 5, danceFun: 8, danceCost: 8 },
 
+  // balance: each guy is an inverted pendulum. Gravity tips him (g), muscles pull back (kp, kd; weaker
+  // drunk), drunk shoves (noise, x drunk^2); leaning past stepAt he catches himself with a step, past
+  // fallAt he goes down. Pushes (Oleg, bumps, puddles) are kicks to this, not instant falls.
+  balance: { g: 9.8, kp: 42, kd: 9, noise: 2.4, stepAt: 0.17, stepLen: 0.22, fallAt: 0.48 },
+
   // drunk physics: bodies push each other apart; running into a drunk guy knocks him over (knockOver:
   // speed/5 x (0.35 + drunk) above it); two drunks (drunk sum > bumpDrunk) bumping may fall (bumpFall);
   // puddles are slippery (slip + drunk/200); a fall makes the others laugh (laugh fun each);

@@ -253,6 +253,11 @@ function makeBoxPerson(opts) {
     setTint(c) {
       if (head.isSprite && head.material.color.getHexString() !== c.replace('#', '')) head.material.color.set(c);
     },
+    // swaying on his feet (balance): forward lean p, sideways r (radians)
+    setLean(p, r) {
+      tilt.rotation.set(p, 0, r);
+      tilt.position.y = 0;
+    },
     // k: 0 standing .. 1 flat on the floor; dir: where he falls, relative to where he faces (radians)
     setFall(k, dir = 0) {
       const a = k * Math.PI * 0.5;

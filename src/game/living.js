@@ -211,18 +211,23 @@ export class Living {
   // ---------- balcony sash ----------
 
   buildWindow() {
+    // one pane of the balcony glazing (the one by the cat's windowsill) opens outward on its hinge:
+    // same frame, same plane as the rest of the glazing (apartment.js), between two of its mullions
     const g = this.game, b = BALCONY, rail = CAT_SPOTS.catRail;
-    const y0 = b.railH + 0.05, y1 = H - 0.1, w = 0.75;
-    const x0 = Math.max(b.x0 + 0.1, Math.min(b.x1 - w - 0.1, rail.p[0] - w / 2));
-    const z = b.z0 - 0.02;
+    const f = 0.05, n = Math.max(1, Math.round((b.x1 - b.x0) / 0.8)), seg = (b.x1 - b.x0) / n;
+    const k = Math.max(0, Math.min(n - 1, Math.floor((rail.p[0] - b.x0) / seg)));
+    const x0 = b.x0 + k * seg + f / 2, x1 = b.x0 + (k + 1) * seg - f / 2, w = x1 - x0;
+    const y0 = b.railH + f, y1 = H - 0.05 - f;
+    const z = b.z0 + b.rail / 2; // the glazing plane
     const pivot = new THREE.Group();
     pivot.position.set(x0, 0, z);
-    const frame = mat('#f4f1ea', { roughness: 0.5 });
-    const glass = new THREE.MeshStandardMaterial({ color: '#a9c3d6', transparent: true, opacity: 0.25, roughness: 0.05, side: THREE.DoubleSide });
-    const bar = (a, b2, c0, c1) => new THREE.Mesh(new THREE.BoxGeometry(b2 - a, c1 - c0, 0.04).translate((a + b2) / 2, (c0 + c1) / 2, 0), frame);
-    pivot.add(bar(0, w, y0, y0 + 0.05), bar(0, w, y1 - 0.05, y1), bar(0, 0.05, y0, y1), bar(w - 0.05, w, y0, y1));
-    pivot.add(new THREE.Mesh(new THREE.PlaneGeometry(w - 0.1, y1 - y0 - 0.1).translate(w / 2, (y0 + y1) / 2, 0), glass));
-    pivot.add(new THREE.Mesh(new THREE.BoxGeometry(0.03, 0.12, 0.05).translate(w - 0.1, (y0 + y1) / 2, 0.03), mat('#c9c4b8', { metalness: 0.6 }))); // handle
+    const frame = mat('#eeeae2', { roughness: 0.5 });
+    const glass = new THREE.MeshStandardMaterial({ color: '#a9c3d6', transparent: true, opacity: 0.2, roughness: 0.05, side: THREE.DoubleSide });
+    const bar = (a, b2, c0, c1) => new THREE.Mesh(new THREE.BoxGeometry(b2 - a, c1 - c0, 0.035).translate((a + b2) / 2, (c0 + c1) / 2, -0.03), frame);
+    const t = 0.04;
+    pivot.add(bar(0, w, y0, y0 + t), bar(0, w, y1 - t, y1), bar(0, t, y0, y1), bar(w - t, w, y0, y1));
+    pivot.add(new THREE.Mesh(new THREE.PlaneGeometry(w - 2 * t, y1 - y0 - 2 * t).translate(w / 2, (y0 + y1) / 2, -0.03), glass));
+    pivot.add(new THREE.Mesh(new THREE.BoxGeometry(0.025, 0.1, 0.03).translate(w - 0.08, (y0 + y1) / 2, 0), mat('#c9c4b8', { metalness: 0.6 }))); // handle, inside
     g.dynamic.add(pivot);
     this.sash = pivot;
     this.sashOpen = 0;
@@ -245,7 +250,7 @@ export class Living {
     const g = this.game, st = g.state, P = TUNE.living;
     // sash swings out / in
     this.sashOpen += ((this.windowOpen ? 1 : 0) - this.sashOpen) * Math.min(1, dt * 5);
-    this.sash.rotation.y = this.sashOpen * 1.1;
+    this.sash.rotation.y = this.sashOpen * 1.1; // swings out over the yard
     // TV
     const tv = this.tv;
     tv.switchT = Math.max(0, tv.switchT - dt);

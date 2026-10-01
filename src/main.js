@@ -359,7 +359,7 @@ let blackFx = 0;
 let hudT = 0;
 
 function frame(now) {
-  const dt = Math.min(0.05, (now - last) / 1000);
+  const dt = Math.max(0, Math.min(0.05, (now - last) / 1000)); // never backwards (first frame)
   last = now;
   time += dt;
 

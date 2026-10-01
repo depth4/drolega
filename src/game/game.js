@@ -272,11 +272,10 @@ export class Game {
           this.shove(b, dz * side, -dx * side);
         }
         if ((a.mode === 'walk' || b.mode === 'walk') && a.drunk + b.drunk > C.bumpDrunk && (a.bumpCd ?? 0) < t && (b.bumpCd ?? 0) < t) {
-          a.bumpCd = b.bumpCd = t + 4;
-          if (Math.random() < C.bumpFall) {
-            const v = Math.random() < 0.5 ? a : b, s = v === a ? -1 : 1;
-            v.fall(Math.atan2(dx * s, dz * s), 'bump');
-          } else (Math.random() < 0.5 ? a : b).figure.play('stumble');
+          a.bumpCd = b.bumpCd = t + 2;
+          // a shoulder bump: both get knocked back, the drunker the harder to stay up
+          a.push(Math.atan2(-dx, -dz), 0.8 + 1.4 * (a.drunk / 100), 'bump');
+          b.push(Math.atan2(dx, dz), 0.8 + 1.4 * (b.drunk / 100), 'bump');
         }
       }
     }
@@ -292,14 +291,9 @@ export class Game {
       this.shove(f, dx * (RO - d), dz * (RO - d));
       if (sp > 0.8 && (f.shoveCd ?? 0) < t) {
         f.shoveCd = t + 1.2;
-        const hit = (sp / 5) * (0.35 + f.drunk / 100);
-        if (hit > C.knockOver && f.fall(Math.atan2(dx, dz), 'shove')) {
-          f.fun = clamp(f.fun - 4);
-          setTimeout(() => f.figure.say('Олег, ты чё?!', 1.8), 700);
-        } else if (hit > 0.2) {
-          f.figure.play('stumble');
-          f.figure.say(['Э, аккуратнее', 'Куда прёшь?', 'Полегче, бро'][Math.floor(Math.random() * 3)], 1.5);
-        }
+        // Oleg's momentum goes into his balance: a walk-by sways him, a run into a drunk one floors him
+        f.push(Math.atan2(dx, dz), sp * (0.6 + 1.2 * f.drunk / 100), 'shove');
+        if (sp > 1.5) f.figure.say(['Э, аккуратнее', 'Куда прёшь?', 'Полегче, бро', 'Олег, ты чё?!'][Math.floor(Math.random() * 4)], 1.5);
       }
     }
   }

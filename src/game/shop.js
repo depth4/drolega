@@ -29,7 +29,7 @@ export class Shop {
     }
     this.cashier = makePerson({ name: 'Продавщица', shirt: '#b34a72', pants: '#3a3340', hair: '#7a3b1e', style: 'sprite' });
     this.cashier.root.position.set(out.cashier[0], STREET, out.cashier[1]);
-    this.cashier.root.rotation.y = Math.PI / 2 * (out.cashier[0] < 0 ? 1 : -1);
+    this.cashier.root.rotation.y = 0; // faces the door (towards the building, +z)
     this.cashier.root.traverse((o) => (o.userData.target = {
       name: 'Продавщица',
       info: () => (this.unpaid.length ? `К оплате: ${this.total()} ₽` : 'Бери с полок, плати тут'),

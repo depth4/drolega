@@ -458,6 +458,24 @@ const SHOTS = {
   },
 };
 
+// losing balance: windmill the arms, bend against the lean, a leg out
+function balanceLayer(p, c) {
+  const b = c.bal;
+  if (!b || b.m < 0.04 || c.pose !== 'stand') return;
+  const m = Math.min(1, b.m / 0.5);
+  p.spine.x -= b.p * 0.9;
+  p.spine.z -= b.r * 0.9;
+  p.neck.x -= b.p * 0.5;
+  for (const [i, s] of SIDES.entries()) {
+    p.arms[i].x += m * (-1.8 + 1.1 * Math.sin(c.T * 15 + i * 2.2));
+    p.arms[i].z += s * m * (0.9 + 0.5 * Math.sin(c.T * 11 + i));
+    p.arms[i].elbow -= 0.3 * m;
+  }
+  const out = b.r > 0 ? 0 : 1; // the leg on the side he's tipping to steps out
+  p.legs[out].z += SIDES[out] * 0.35 * m;
+  p.legs[out].x -= 0.3 * m * Math.sign(b.p);
+}
+
 function drunkLayer(p, c) {
   const d = c.drunk;
   if (d < 0.05 || c.pose === 'lie') return;
@@ -651,11 +669,11 @@ export function createRig(body, { m, sk, style }) {
     get busy() {
       return !!shot;
     },
-    update(dt, { walking = false, speed = 1.8, drunk = 0, music = false } = {}) {
+    update(dt, { walking = false, speed = 1.8, drunk = 0, music = false, bal = null } = {}) {
       T += dt;
       ctx.dt = dt;
       if (walking) walkPhase += dt * speed * ((2 * Math.PI) / 1.35);
-      Object.assign(ctx, { pose, walking, walkPhase, drunk, beat: (T * 2 * Math.PI) / 0.6, music });
+      Object.assign(ctx, { pose, walking, walkPhase, drunk, beat: (T * 2 * Math.PI) / 0.6, music, bal });
 
       // ---- build the target pose
       const p = defaultPose();
@@ -668,6 +686,7 @@ export function createRig(body, { m, sk, style }) {
         if (shot.u >= shot.dur) shot = null;
       }
       drunkLayer(p, ctx);
+      balanceLayer(p, ctx);
 
       // ---- physics: how floppy tonight, and how the body is being thrown around
       const d = Math.min(1, drunk);
