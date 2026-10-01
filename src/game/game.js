@@ -477,6 +477,10 @@ export class Game {
     particles.clear();
     this.events?.reset();
     this.pc?.reset();
+    if (this.cooking) {
+      this.cooking.end(); // a night can end in the middle of the pelmeni close-up
+      this.cooking.pot.visible = false;
+    }
     this.living?.reset();
     this.shop?.reset();
     this.placeBucket(...this.bucketHome);

@@ -21,6 +21,7 @@ export class Player {
     this.z = z;
     this.yaw = yaw;
     this.pitch = 0;
+    this.floorY = undefined; // snap to the floor there, don't glide up from the street
   }
 
   look(dx, dy) {
