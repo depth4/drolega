@@ -35,7 +35,6 @@ export function createMirror({ furn, scene, hands, style }) {
     hands.root.visible = hv;
   };
 
-  let t = 0;
   return {
     restyle(styleName) {
       scene.remove(oleg.root);
@@ -44,7 +43,6 @@ export function createMirror({ furn, scene, hands, style }) {
       scene.add(oleg.root);
     },
     update(dt, { x, z, yaw, moving, drunk, item }) {
-      t += dt;
       oleg.root.position.set(x, 0, z);
       oleg.root.rotation.y = yaw + Math.PI;
       oleg.setLoop(null);

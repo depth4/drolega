@@ -338,16 +338,14 @@ function visibleChain(o) {
   for (; o; o = o.parent) if (!o.visible) return false;
   return true;
 }
-let aimPoint = null;
 let wasFocused = false;
 const focusRay = new THREE.Raycaster();
 function findTarget() {
   ray.setFromCamera(center, camera);
-  aimPoint = null;
   for (const hit of ray.intersectObjects(pickRoots, true)) {
     if (!visibleChain(hit.object)) continue;
     if (hit.object.isSprite && !hit.object.parent?.userData.target) continue; // labels don't block
-    aimPoint = hit.point;
+
     for (let o = hit.object; o; o = o.parent) if (o.userData.target) return o.userData.target;
     return null; // a wall or something without a target is in the way
   }

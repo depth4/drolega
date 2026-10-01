@@ -267,7 +267,7 @@ const BUILD = {
     f.box(U - 0.02, U + 0.03, 0.55, 0.85, 0.1, 0.35, M.rag); // the rag hangs here
   },
   toilet(f) {
-    const { U, D } = f;
+    const { U } = f;
     f.box(0.1, U - 0.1, 0.4, 0.8, 0, 0.18, M.enamel);
     f.cyl(U / 2, 0.36, 0, 0.4, 0.17, 0.2, M.enamel);
     f.cyl(U / 2, 0.37, 0.4, 0.42, 0.19, 0.19, mat('#d8d3c8'));

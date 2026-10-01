@@ -741,7 +741,6 @@ export function createRig(body, { m, sk, style }) {
         spring(leg.knee.rotation, 'x', p.legs[i].knee, sdt, 1.4);
       }
       const k = 1 - Math.exp(-dt * 16 * (1 - 0.5 * d));
-      const lp = (obj, key, v, kk = k) => (obj[key] += (v - obj[key]) * kk);
       body.parent?.updateMatrixWorld(true);
       body.updateMatrixWorld(true);
 

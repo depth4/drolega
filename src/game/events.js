@@ -9,11 +9,6 @@ import { particles } from '../world/particles.js';
 import { rand, clamp, nearestNode } from './friends.js';
 
 const TOAST_SPOTS = ['table1', 'table2', 'table3', 'sofaA'];
-const QUARREL_LINES = [
-  ['Ты чё сказал?!', 'Повтори, бля!', 'Ты чё, охуел?', 'Да я тебя щас…'],
-  ['Да пошёл ты!', 'Чё ты мне сделаешь?', 'Сам такой!', 'Иди нахуй, понял?'],
-];
-const TOAST_LINES = ['За Олега!', 'Ура-а-а!', 'За хату!', 'Будем!'];
 
 export class PartyEvents {
   constructor(game) {
@@ -54,6 +49,7 @@ export class PartyEvents {
 
   startToast() {
     const g = this.game, guys = this.free();
+    if (!guys.length) return;
     const host = guys[Math.floor(Math.random() * guys.length)];
     host.figure.play('shout');
     this.toast = { left: TUNE.events.toastWindow, guys, drank: false };
@@ -116,7 +112,9 @@ export class PartyEvents {
   }
 
   startQuarrel() {
-    const g = this.game, [a, b] = this.pair();
+    const g = this.game, pair = this.pair();
+    if (!pair) return;
+    const [a, b] = pair;
     a.endActivity(true);
     b.endActivity(true);
     a.standUp?.();

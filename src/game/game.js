@@ -2,11 +2,10 @@
 // puddles, broken things, the stove, the grill, the cat toy and Oleg himself.
 import * as THREE from 'three';
 import { TUNE } from '../config.js';
-import { FURNITURE, TOY_SPOTS, VISITOR_SPOT, CAT_SPOTS, SPOTS, roomAt } from '../world/layout.js';
+import { TOY_SPOTS, VISITOR_SPOT, CAT_SPOTS, SPOTS, roomAt } from '../world/layout.js';
 import { makePerson, makePuddle, makeToy, makeBottle, makePlate, makeBrokenMark, makeBucket } from '../world/figures.js';
 import { Friend, Cat, clamp, rand } from './friends.js';
 import { particles } from '../world/particles.js';
-import { icon } from '../ui/icons.js';
 import { Interactions } from './interact.js';
 import { Cooking } from './cooking.js';
 import { PartyEvents } from './events.js';
@@ -147,7 +146,7 @@ export class Game {
   }
 
   vibeTick(dt) {
-    const V = TUNE.vibe, o = this.oleg, st = this.state;
+    const V = TUNE.vibe, o = this.oleg;
     const c = this.company();
     this.vibe = c.length;
     o.dance = Math.max(0, (o.dance ?? 0) - dt);
@@ -1010,10 +1009,7 @@ export class Game {
 
   // the phone's cart: { id: count } — all of it in one delivery
   buyCart(cart) {
-    const list = [];
-    for (const [id, n] of Object.entries(cart)) for (let i = 0; i < n; i++) if (this.buy(id, true)) list.push(id);
-    if (!list.length) return;
-    const o = this.orders.find((x) => !x.done);
+    for (const [id, n] of Object.entries(cart)) for (let i = 0; i < n; i++) this.buy(id, true);
   }
 
   buy(id, quiet = false) {
