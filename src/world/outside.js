@@ -116,17 +116,17 @@ export function buildOutside() {
   pbox(group, FRONT.x0, FRONT.x1, STREET - 0.3, STREET, FRONT.z0, FRONT.z1, mat('#2b2c2e', { roughness: 1 }));
   pbox(group, FRONT.x0, FRONT.x1, STREET, STREET + 0.06, -1.9, FRONT.z1, mat('#55534f', { roughness: 1 })); // sidewalk
   pbox(group, -0.4, 8.3, STREET, -0.25, -0.5, -0.42, facade, 1); // the house below the flat's windows
-  wall(-0.4, 8.3, -0.5, -0.42);
+  wall(-0.4, 8.3, -0.5, -0.42, { floor: [-9, -2] }); // street level only (the balcony door is right above)
   const fence = mat('#3b4a3a', { metalness: 0.3 });
-  for (const [x0, x1, z0, z1] of [
+  for (const [x0, x1, z0, z1, streetOnly] of [
     [FRONT.x0, FRONT.x1, FRONT.z0 - 0.1, FRONT.z0],
     [FRONT.x0 - 0.1, FRONT.x0, FRONT.z0, FRONT.z1],
     [FRONT.x1, FRONT.x1 + 0.1, FRONT.z0, FRONT.z1],
-    [FRONT.x0, -0.4, FRONT.z1 - 0.08, FRONT.z1 + 0.05],
-    [10.9, FRONT.x1, FRONT.z1 - 0.08, FRONT.z1 + 0.05],
+    [FRONT.x0, -0.4, FRONT.z1 - 0.08, FRONT.z1 + 0.05, true],
+    [10.9, FRONT.x1, FRONT.z1 - 0.08, FRONT.z1 + 0.05, true],
   ]) {
     pbox(group, x0, x1, STREET, STREET + 1.1, z0, z1, fence);
-    wall(x0, x1, z0, z1);
+    wall(x0, x1, z0, z1, streetOnly ? { floor: [-9, -2] } : {});
   }
   for (const [x, z] of [[2, -3.2], [12.5, -3.2]]) {
     pbox(group, x - 0.06, x + 0.06, STREET, STREET + 4.2, z - 0.06, z + 0.06, railMat);
