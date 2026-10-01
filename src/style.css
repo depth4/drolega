@@ -93,9 +93,9 @@ button:disabled { opacity: 0.4; cursor: not-allowed; }
 .ava .badge { position: absolute; top: -4px; right: -5px; width: 18px; height: 18px; border-radius: 50%; background: var(--bad); color: #fff; font: 700 12px/18px var(--display); font-style: normal; text-align: center; box-shadow: 0 0 0 2px #120d10, 0 0 10px rgba(255, 90, 79, 0.7); transform: scale(0); transition: transform 0.2s cubic-bezier(0.3, 1.6, 0.5, 1); }
 .crew { display: grid; gap: 7px; }
 .mate { display: flex; align-items: center; gap: 9px; }
-.mate .name { font: 12px var(--display); letter-spacing: 0.03em; color: var(--ink); text-shadow: var(--shadow); }
+.mate .name { font: 12px var(--display); letter-spacing: 0.03em; color: var(--ink); padding: 3px 8px; border-radius: 7px; background: rgba(13, 12, 17, 0.55); backdrop-filter: blur(4px); }
 .mate.bad .badge { transform: scale(1); animation: hop 0.6s ease-in-out infinite; }
-.mate.bad .name { color: #ff9a8f; }
+.mate.bad .name { color: #ffb3aa; background: rgba(90, 20, 18, 0.6); }
 @keyframes hop { 50% { translate: 0 -2px; } }
 
 /* --- top right: the party */
