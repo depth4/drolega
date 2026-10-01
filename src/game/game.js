@@ -905,9 +905,17 @@ export class Game {
     if (st.money < item.price) return this.toast('Не хватает денег', 'bad');
     st.money -= item.price;
     st.stats.spent += item.price;
-    const eta = rand(TUNE.delivery.min, TUNE.delivery.max);
-    this.orders.push({ title: item.title, icon: item.icon, gives: item.gives, eta, total: eta });
     this.sfx.ding();
+    // one courier: whatever you buy while he's on the way goes into the same delivery
+    const open = this.orders.find((o) => !o.done);
+    if (open) {
+      for (const [k, v] of Object.entries(item.gives)) open.gives[k] = (open.gives[k] ?? 0) + v;
+      open.items.push(item.title);
+      open.title = open.items.join(', ');
+      return this.toast(`Добавил в заказ: ${item.title}. Тот же курьер, через ~${this.gameMinutes(open.eta)} мин`, 'info');
+    }
+    const eta = rand(TUNE.delivery.min, TUNE.delivery.max);
+    this.orders.push({ title: item.title, items: [item.title], icon: item.icon, gives: { ...item.gives }, eta, total: eta });
     this.toast(`Заказ: ${item.title}. Курьер будет через ~${this.gameMinutes(eta)} мин`, 'info');
   }
 

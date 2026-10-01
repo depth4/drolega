@@ -8,7 +8,7 @@ const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&l
 
 export function createHUD({ onBuy }) {
   const el = {
-    hud: $('hud'), night: $('night'), time: $('time'), room: $('room'),
+    hud: $('hud'), night: $('night'), time: $('time'), room: $('room'), courier: $('courier-chip'),
     energy: $('bar-energy'), ofun: $('bar-ofun'), othirst: $('othirst'), handName: $('hand-name'), total: $('bar-total'), hut: $('bar-hut'), noise: $('bar-noise'), anger: $('anger'), people: $('people'), toasts: $('toasts'),
     prompt: $('prompt'), hotbar: $('hotbar'), doorAlert: $('door-alert'), blackout: $('blackout'),
     phone: $('phone'), phoneTime: $('phone-time'), phoneMoney: $('phone-money'),
@@ -118,6 +118,13 @@ export function createHUD({ onBuy }) {
       el.night.textContent = `НОЧЬ ${game.night}`;
       el.time.textContent = game.clock;
       el.room.textContent = roomName ?? '';
+      // the courier: when he comes and with what, right under the clock
+      const atDoor = game.visitor?.type === 'courier';
+      const order = game.orders.find((o) => !o.done);
+      el.courier.hidden = !atDoor && !order;
+      el.courier.classList.toggle('here', atDoor);
+      if (atDoor) el.courier.textContent = `🛵 Курьер у двери! Открой (${Math.ceil(game.visitor.left)} c)`;
+      else if (order) el.courier.textContent = `🛵 Курьер через ${game.gameMinutes(order.eta)} мин: ${order.title}`;
       el.total.style.width = `${st.totalFun}%`;
       el.total.parentElement.classList.toggle('low', st.totalFun < 25);
       el.hut.style.width = `${st.hut}%`;
