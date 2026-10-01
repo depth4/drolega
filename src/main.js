@@ -95,6 +95,7 @@ let dragging = false;
 const isTouchOnly = matchMedia('(pointer: coarse)').matches && !matchMedia('(pointer: fine)').matches;
 if (isTouchOnly) {
   $('btn-play').disabled = true;
+  document.querySelectorAll('#night-pick button').forEach((b) => (b.disabled = true));
   $('mobile-note').hidden = false;
 }
 
