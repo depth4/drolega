@@ -243,6 +243,7 @@ export class Game {
   bumps() {
     const C = TUNE.chaos, t = this.state.t, R2 = C.radius * 2;
     const ppl = this.friends.filter((f) => !f.fallen && f.figure.pose === 'stand' && !f.follow && f.figure.root.visible);
+    for (const key in this.stuck ?? {}) this.stuck[key] = Math.max(0, this.stuck[key] - 1 / 120);
     for (let i = 0; i < ppl.length; i++) {
       for (let j = i + 1; j < ppl.length; j++) {
         const a = ppl[i], b = ppl[j];
@@ -251,9 +252,25 @@ export class Game {
         if (d >= R2 || d < 1e-4) continue;
         dx /= d;
         dz /= d;
+        // stuck face to face in a doorway for a second: they squeeze past each other
+        if ((a.ghost ?? 0) > t || (b.ghost ?? 0) > t) continue;
+        const pairKey = a.id + b.id;
+        this.stuck ??= {};
+        this.stuck[pairKey] = (this.stuck[pairKey] ?? 0) + 1 / 60;
+        if (this.stuck[pairKey] > 1) {
+          a.ghost = b.ghost = t + 1.5;
+          this.stuck[pairKey] = 0;
+          continue;
+        }
         const push = (R2 - d) / 2;
         this.shove(a, -dx * push, -dz * push);
         this.shove(b, dx * push, dz * push);
+        // walking into each other: both step to their right to pass
+        if (a.mode === 'walk' || b.mode === 'walk') {
+          const side = 0.03;
+          this.shove(a, -dz * side, dx * side);
+          this.shove(b, dz * side, -dx * side);
+        }
         if ((a.mode === 'walk' || b.mode === 'walk') && a.drunk + b.drunk > C.bumpDrunk && (a.bumpCd ?? 0) < t && (b.bumpCd ?? 0) < t) {
           a.bumpCd = b.bumpCd = t + 4;
           if (Math.random() < C.bumpFall) {
@@ -446,7 +463,7 @@ export class Game {
       photos: [],
       photoCats: new Set(),
     };
-    this.oleg = { fun: 80, drunk: 0, blackout: 0, energy: TUNE.energy.max, thirst: 0, fall: null };
+    this.oleg = { fun: 80, drunk: 0, blackout: 0, energy: TUNE.energy.max, thirst: 0, fall: null, dance: 0 };
     this.inv = new Inventory(this);
     this.toasts = [];
     this.toastKeys = {};

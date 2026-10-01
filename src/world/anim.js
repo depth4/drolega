@@ -594,6 +594,23 @@ export function createRig(body, { m, sk, style }) {
   }
 
   const fkQ = new THREE.Quaternion(), ikQ = new THREE.Quaternion(), eul = new THREE.Euler();
+  // ---- the body is physical: every joint is a damped spring chasing the animation's target, pushed by
+  // the body's own acceleration (stop short and the torso and arms swing on) and, when drunk, by random
+  // shoves. Drunk = weaker, bouncier springs and more shoves: limbs flop, the head bobbles.
+  const vel = new WeakMap();
+  const swingQ = new THREE.Quaternion();
+  const rootPos = new THREE.Vector3(), rootVel = new THREE.Vector3(), rootAcc = new THREE.Vector3(), tmp = new THREE.Vector3();
+  let rootInit = false;
+  const phys = { k: 260, zeta: 0.85, push: 0 };
+  const spring = (obj, key, target, dt, kMul = 1, kick = 0) => {
+    let v = vel.get(obj);
+    if (!v) vel.set(obj, (v = {}));
+    const k = phys.k * kMul, c = 2 * phys.zeta * Math.sqrt(k);
+    const x = obj[key], vx = (v[key] ?? 0) + ((target - x) * k - (v[key] ?? 0) * c) * dt + kick;
+    v[key] = vx;
+    obj[key] = x + vx * dt;
+  };
+  const noise = (amt) => (Math.random() - 0.5) * 2 * amt;
   const mouthW = new THREE.Vector3(), faceW = new THREE.Vector3();
 
   function prop(arm, name) {
@@ -652,23 +669,51 @@ export function createRig(body, { m, sk, style }) {
       }
       drunkLayer(p, ctx);
 
-      // ---- apply with smoothing
-      const k = 1 - Math.exp(-dt * 16);
-      const kb = 1 - Math.exp(-dt * 9);
-      const lp = (obj, key, v, kk = k) => (obj[key] += (v - obj[key]) * kk);
-      lp(pelvis.position, 'x', p.body.x, kb);
-      lp(pelvis.position, 'y', DIM.hip + p.body.y, kb);
-      lp(pelvis.position, 'z', p.body.z, kb);
-      for (const a of ['x', 'y', 'z']) {
-        lp(pelvis.rotation, a, p.pelvis[a], kb);
-        lp(spine.rotation, a, p.spine[a], kb);
-        lp(neck.rotation, a, p.neck[a]);
+      // ---- physics: how floppy tonight, and how the body is being thrown around
+      const d = Math.min(1, drunk);
+      phys.k = 260 * (1 - 0.6 * d);
+      phys.zeta = 0.85 - 0.5 * d;
+      const sdt = Math.min(dt, 1 / 30);
+      const root = body.parent?.parent ?? body.parent;
+      if (root) {
+        root.getWorldPosition(tmp);
+        if (!rootInit) {
+          rootPos.copy(tmp);
+          rootInit = true;
+        }
+        const nv = tmp.clone().sub(rootPos).divideScalar(Math.max(dt, 1e-3));
+        if (nv.length() > 8) nv.set(0, 0, 0); // teleports are not accelerations
+        rootAcc.copy(nv).sub(rootVel).divideScalar(Math.max(dt, 1e-3)).clampLength(0, 30);
+        rootVel.copy(nv);
+        rootPos.copy(tmp);
+        // into the body's frame: +z forward, +x to its left
+        const yaw = root.rotation.y;
+        const fwd = Math.sin(yaw) * rootAcc.x + Math.cos(yaw) * rootAcc.z;
+        const side = Math.cos(yaw) * rootAcc.x - Math.sin(yaw) * rootAcc.z;
+        phys.fwd = fwd;
+        phys.side = side;
       }
+      const lean = (amt) => -(phys.fwd ?? 0) * amt * sdt; // speeding up throws the top back, braking throws it forward
+      const roll = (amt) => (phys.side ?? 0) * amt * sdt;
+      const shove = 4 * d * d; // random drunk shoves (rad/s per frame)
+      pelvis.position.x += (p.body.x - pelvis.position.x) * Math.min(1, dt * 9);
+      pelvis.position.z += (p.body.z - pelvis.position.z) * Math.min(1, dt * 9);
+      spring(pelvis.position, 'y', DIM.hip + p.body.y, sdt, 1.2);
+      for (const a of ['x', 'y', 'z']) spring(pelvis.rotation, a, p.pelvis[a], sdt, 0.9, a === 'z' ? noise(shove * 0.3) : 0);
+      spring(spine.rotation, 'x', p.spine.x, sdt, 0.8, lean(0.06) + noise(shove * 0.5));
+      spring(spine.rotation, 'y', p.spine.y, sdt, 0.8);
+      spring(spine.rotation, 'z', p.spine.z, sdt, 0.8, roll(0.05) + noise(shove * 0.6));
+      // the head is heavy and loose on a drunk neck
+      spring(neck.rotation, 'x', p.neck.x, sdt, 0.7 - 0.25 * d, lean(0.1) + noise(shove));
+      spring(neck.rotation, 'y', p.neck.y, sdt, 0.7);
+      spring(neck.rotation, 'z', p.neck.z, sdt, 0.7 - 0.25 * d, roll(0.1) + noise(shove));
       for (const [i, leg] of legs.entries()) {
-        lp(leg.hip.rotation, 'x', p.legs[i].x);
-        lp(leg.hip.rotation, 'z', p.legs[i].z);
-        lp(leg.knee.rotation, 'x', p.legs[i].knee);
+        spring(leg.hip.rotation, 'x', p.legs[i].x, sdt, 1.4, noise(shove * 0.4));
+        spring(leg.hip.rotation, 'z', p.legs[i].z, sdt, 1.4);
+        spring(leg.knee.rotation, 'x', p.legs[i].knee, sdt, 1.4);
       }
+      const k = 1 - Math.exp(-dt * 16 * (1 - 0.5 * d));
+      const lp = (obj, key, v, kk = k) => (obj[key] += (v - obj[key]) * kk);
       body.parent?.updateMatrixWorld(true);
       body.updateMatrixWorld(true);
 
@@ -691,7 +736,13 @@ export function createRig(body, { m, sk, style }) {
           elbow += (e - elbow) * arm.ikW;
         }
         arm.shoulder.quaternion.slerp(fkQ, k);
-        lp(arm.elbow.rotation, 'x', elbow);
+        // the arm swings on its own: inertia from the body, drunk flailing; less so when it holds something
+        arm.swing ??= { x: 0, z: 0 };
+        const free = 1 - arm.ikW;
+        spring(arm.swing, 'x', 0, sdt, 0.5, free * (lean(0.12) + noise(shove * 0.9)));
+        spring(arm.swing, 'z', 0, sdt, 0.5, free * (roll(0.12) * SIDES[i] + noise(shove * 0.8)));
+        arm.shoulder.quaternion.multiply(swingQ.setFromEuler(eul.set(arm.swing.x, 0, arm.swing.z)));
+        spring(arm.elbow.rotation, 'x', elbow, sdt, 1.1, noise(shove * 0.8) * free);
         const pr = prop(arm, a.prop);
         if (pr) {
           if (a.look) {
