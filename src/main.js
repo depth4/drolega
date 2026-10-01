@@ -47,7 +47,7 @@ const hands = createViewmodel(camera);
 let mirror = null; // created at boot, once the head style is known
 let phoneBob = 0;
 const fx = makeFX(renderer, scene, camera);
-const hud = createHUD({ onBuy: (id) => game.buy(id) });
+const hud = createHUD({ onBuy: (cart) => game.buyCart(cart) });
 // close-up hands-on scenes (pelmeni): the mouse is free, the camera flies in, the world slows down
 // close-ups where the camera flies to something and the mouse works on it: the pelmeni pot, the PC
 const focuser = () => (game.cooking.focus ? game.cooking : game.pc.focus ? game.pc : null);
@@ -283,8 +283,6 @@ addEventListener('keydown', (e) => {
   if (k === 'KeyC' && !phoneOpen) return setPhotoMode(!photoMode);
   if (photoMode && k === 'Escape') return setPhotoMode(false);
   if (k === 'KeyF') return setPhone(!phoneOpen);
-  if (phoneOpen && k === 'ArrowLeft') return hud.shopStep(-1);
-  if (phoneOpen && k === 'ArrowRight') return hud.shopStep(1);
   if (k === 'Escape') return phoneOpen ? setPhone(false) : pause();
   if (phoneOpen || game.oleg.blackout > 0 || game.talkLocked) return;
   if (k.startsWith('Digit')) {

@@ -13,7 +13,7 @@ export function createHUD({ onBuy }) {
     prompt: $('prompt'), hotbar: $('hotbar'), doorAlert: $('door-alert'), blackout: $('blackout'),
     phone: $('phone'), phoneTime: $('phone-time'), phoneMoney: $('phone-money'),
     tabCam: $('tab-cam'), tabShop: $('tab-shop'), cam: $('phone-cam'), camView: $('cam-view'), camWho: $('cam-who'),
-    shop: $('phone-shop'), shopCard: $('shop-card'), shopDots: $('shop-dots'), orders: $('orders'),
+    shop: $('phone-shop'), shopList: $('shop-list'), shopTotal: $('shop-total'), orders: $('orders'),
     slide: $('slide'), slideKnob: $('slide-knob'), slideFill: $('slide-fill'), slideText: $('slide-text'),
   };
   let cache = {};
@@ -23,36 +23,32 @@ export function createHUD({ onBuy }) {
     node.innerHTML = html;
   };
 
-  // ---- phone: shop carousel with slide-to-buy
+  // ---- phone shop: one page — every item with − / +, the total, one slide buys it all (one courier)
   const items = TUNE.shop.filter((s) => !s.soon);
-  let idx = 0;
+  const cart = Object.fromEntries(items.map((it) => [it.id, 0]));
   let money = 0;
   $('ico-cam').src = iconURL('camera');
   $('ico-shop').src = iconURL('cart');
-  const renderCard = () => {
-    const it = items[idx];
-    el.shopCard.innerHTML = `<button class="arrow l" type="button" data-step="-1">‹</button>${iconImg(it.icon, '')}<b>${esc(it.title)}</b><small>${esc(it.note ?? '')}</small><div class="price">${it.price} ₽</div><button class="arrow r" type="button" data-step="1">›</button>`;
-    el.shopDots.innerHTML = items.map((_, k) => `<i class="${k === idx ? 'on' : ''}"></i>`).join('');
+  const total = () => items.reduce((sum, it) => sum + cart[it.id] * it.price, 0);
+  const renderShop = () => {
+    el.shopList.innerHTML = items
+      .map((it) => `<div class="shop-row${cart[it.id] ? ' in' : ''}" data-id="${it.id}">${iconImg(it.icon, '')}<div class="info"><b>${esc(it.title)}</b><small>${esc(it.note ?? '')}</small><span class="price">${it.price} ₽</span></div><div class="qty"><button type="button" data-d="-1">−</button><span>${cart[it.id]}</span><button type="button" data-d="1">+</button></div></div>`)
+      .join('');
     updateSlide();
   };
-  const step = (d) => {
-    idx = (idx + d + items.length) % items.length;
-    renderCard();
-  };
   const updateSlide = () => {
-    const poor = money < items[idx].price;
-    el.slide.classList.toggle('no', poor);
-    el.slideText.textContent = poor ? 'Не хватает денег' : `Сдвинь → заказать за ${items[idx].price} ₽`;
+    const sum = total(), poor = sum > money;
+    el.shopTotal.innerHTML = sum ? `Итого <b>${sum} ₽</b> · останется ${money - sum} ₽` : `Баланс ${money} ₽ — выбери, что заказать`;
+    el.shopTotal.classList.toggle('poor', poor);
+    el.slide.classList.toggle('no', poor || !sum);
+    el.slideText.textContent = !sum ? 'Корзина пуста' : poor ? 'Не хватает денег' : `Сдвинь → купить всё за ${sum} ₽`;
   };
-  el.shopCard.addEventListener('click', (e) => {
-    const d = e.target.closest('[data-step]')?.dataset.step;
-    if (d) step(Number(d));
-  });
-  let swipeX = null;
-  el.shopCard.addEventListener('pointerdown', (e) => (swipeX = e.clientX));
-  el.shopCard.addEventListener('pointerup', (e) => {
-    if (swipeX !== null && Math.abs(e.clientX - swipeX) > 40) step(e.clientX < swipeX ? 1 : -1);
-    swipeX = null;
+  el.shopList.addEventListener('click', (e) => {
+    const b = e.target.closest('[data-d]');
+    if (!b) return;
+    const id = b.closest('[data-id]').dataset.id;
+    cart[id] = Math.max(0, Math.min(9, cart[id] + Number(b.dataset.d)));
+    renderShop();
   });
   // slide-to-buy: drag the knob to the other end
   el.slideKnob.style.backgroundImage = `url(${iconURL('cart', { bare: true })})`;
@@ -64,7 +60,7 @@ export function createHUD({ onBuy }) {
     el.slideFill.style.width = `${x + 30}px`;
   };
   el.slideKnob.addEventListener('pointerdown', (e) => {
-    if (money < items[idx].price) return;
+    if (!total() || total() > money) return;
     drag = { x0: e.clientX };
     el.slideKnob.setPointerCapture(e.pointerId);
   });
@@ -74,12 +70,14 @@ export function createHUD({ onBuy }) {
     const x = e.clientX - drag.x0;
     drag = null;
     if (x >= maxX() * 0.9) {
-      onBuy(items[idx].id);
+      onBuy({ ...cart });
+      for (const id in cart) cart[id] = 0;
+      renderShop();
       el.slide.animate([{ background: 'rgba(127,212,138,0.6)' }, { background: '' }], 500);
     }
     setKnob(0, true);
   });
-  renderCard();
+  renderShop();
 
   const tab = (which) => {
     el.tabCam.classList.toggle('on', which === 'cam');
@@ -97,7 +95,6 @@ export function createHUD({ onBuy }) {
     reset() {
       cache = {};
     },
-    shopStep: step,
     // progress of a hands-on action, under the crosshair
     setUse(h) {
       const u = $('use');

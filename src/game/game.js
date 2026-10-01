@@ -26,6 +26,8 @@ export const ITEMS = {
 };
 
 const FRIEND_IDS = ['alexey', 'lyokha', 'kirill', 'temych'];
+// "Пиво ×4, Пиво ×4, Пельмени" -> "Пиво ×4 ×2, Пельмени"
+const summarize = (titles) => Object.entries(titles.reduce((m, t) => ((m[t] = (m[t] ?? 0) + 1), m), {})).map(([t, n]) => (n > 1 ? `${t} — ${n} шт` : t)).join(', ');
 const BREAKABLE = ['stenka', 'ficus', 'microwave', 'sisterDesk', 'kitchenTable', 'wardrobe', 'loftBed', 'olegBed', 'sofa'];
 
 class Inventory {
@@ -898,11 +900,20 @@ export class Game {
     } else this.toast(`${forced ? 'Пришлось' : 'Дал'} взятку ментам: −${bribe}₽`, 'bad');
   }
 
-  buy(id) {
+  // the phone's cart: { id: count } — all of it in one delivery
+  buyCart(cart) {
+    const list = [];
+    for (const [id, n] of Object.entries(cart)) for (let i = 0; i < n; i++) if (this.buy(id, true)) list.push(id);
+    if (!list.length) return;
+    const o = this.orders.find((x) => !x.done);
+    this.toast(`Заказ оформлен: ${o.title}. Курьер через ~${this.gameMinutes(o.eta)} мин`, 'good');
+  }
+
+  buy(id, quiet = false) {
     const item = TUNE.shop.find((s) => s.id === id);
     const st = this.state;
-    if (!item || item.soon) return;
-    if (st.money < item.price) return this.toast('Не хватает денег', 'bad');
+    if (!item || item.soon) return false;
+    if (st.money < item.price) return quiet ? false : this.toast('Не хватает денег', 'bad');
     st.money -= item.price;
     st.stats.spent += item.price;
     this.sfx.ding();
@@ -911,12 +922,14 @@ export class Game {
     if (open) {
       for (const [k, v] of Object.entries(item.gives)) open.gives[k] = (open.gives[k] ?? 0) + v;
       open.items.push(item.title);
-      open.title = open.items.join(', ');
-      return this.toast(`Добавил в заказ: ${item.title}. Тот же курьер, через ~${this.gameMinutes(open.eta)} мин`, 'info');
+      open.title = summarize(open.items);
+      if (!quiet) this.toast(`Добавил в заказ: ${item.title}. Тот же курьер, через ~${this.gameMinutes(open.eta)} мин`, 'info');
+      return true;
     }
     const eta = rand(TUNE.delivery.min, TUNE.delivery.max);
     this.orders.push({ title: item.title, items: [item.title], icon: item.icon, gives: { ...item.gives }, eta, total: eta });
-    this.toast(`Заказ: ${item.title}. Курьер будет через ~${this.gameMinutes(eta)} мин`, 'info');
+    if (!quiet) this.toast(`Заказ: ${item.title}. Курьер будет через ~${this.gameMinutes(eta)} мин`, 'info');
+    return true;
   }
 
   // ---------- targets ----------
