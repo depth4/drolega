@@ -13,6 +13,7 @@
 // elbows negative = bend, spine positive = lean forward, neck negative = look up.
 // Arms/legs index 0 = right (x < 0), 1 = left. side = -1 / +1.
 import * as THREE from 'three';
+import { blockyBottle } from './goods.js';
 import { mat } from './apartment.js';
 import { particles } from './particles.js';
 
@@ -51,21 +52,18 @@ function vSlice(geo, v0, v1) {
 // ---------- props held in a hand (built along +z, origin at the grip) ----------
 
 const PROPS = {
+  // the same blocky bottles as on the table and the shop shelves, laid along +z (neck forward)
   beer() {
-    const g = new THREE.Group();
-    const glass = new THREE.MeshStandardMaterial({ color: '#4a2a10', roughness: 0.15, metalness: 0.1, transparent: true, opacity: 0.9 });
-    g.add(new THREE.Mesh(new THREE.CylinderGeometry(0.032, 0.032, 0.19, 10).rotateX(Math.PI / 2).translate(0, 0, -0.02), glass));
-    g.add(new THREE.Mesh(new THREE.CylinderGeometry(0.012, 0.028, 0.09, 10).rotateX(Math.PI / 2).translate(0, 0, 0.12), glass));
-    g.add(new THREE.Mesh(new THREE.CylinderGeometry(0.033, 0.033, 0.07, 10).rotateX(Math.PI / 2).translate(0, 0, -0.03), mat('#d9b23a')));
-    return g;
+    const b = blockyBottle('beer');
+    b.rotation.x = Math.PI / 2;
+    b.position.z = -0.1;
+    return new THREE.Group().add(b);
   },
   vodka() {
-    const g = new THREE.Group();
-    const glass = new THREE.MeshStandardMaterial({ color: '#e6eef2', roughness: 0.05, metalness: 0.1, transparent: true, opacity: 0.75 });
-    g.add(new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.035, 0.2, 10).rotateX(Math.PI / 2).translate(0, 0, -0.02), glass));
-    g.add(new THREE.Mesh(new THREE.CylinderGeometry(0.013, 0.03, 0.09, 10).rotateX(Math.PI / 2).translate(0, 0, 0.125), glass));
-    g.add(new THREE.Mesh(new THREE.CylinderGeometry(0.036, 0.036, 0.08, 10).rotateX(Math.PI / 2).translate(0, 0, -0.03), mat('#c23b2e')));
-    return g;
+    const b = blockyBottle('vodka');
+    b.rotation.x = Math.PI / 2;
+    b.position.z = -0.12;
+    return new THREE.Group().add(b);
   },
   snack() {
     const g = new THREE.Group();

@@ -74,7 +74,7 @@ window.__game = game; // handy in the console
 window.__player = player;
 window.__spots = SPOTS;
 window.__three = THREE; // debugging: raycasts from the console
-const lightPool = createLightPool(scene, 6);
+const lightPool = createLightPool(scene, 6, (p) => { const r = p.y > -0.3 && roomAt(p.x, p.z); return r && r.id !== 'landing' ? 'flat' : 'out'; });
 window.__renderer = renderer; window.__scene = scene;
 window.__tune = TUNE; // balance numbers, live
 window.__ragdoll = ragdoll; // physics debugging

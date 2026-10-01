@@ -6,26 +6,38 @@ import * as THREE from 'three';
 import { mat } from './apartment.js';
 
 // ---------- bottles ----------
-// lathe profiles: [radius, height] from the bottom up (metres, real size)
-const PROFILES = {
-  vodka: [[0, 0], [0.034, 0], [0.036, 0.008], [0.036, 0.19], [0.03, 0.22], [0.015, 0.25], [0.012, 0.285], [0.014, 0.3], [0, 0.3]],
-  beer: [[0, 0], [0.031, 0], [0.033, 0.008], [0.033, 0.14], [0.028, 0.17], [0.014, 0.2], [0.012, 0.235], [0.014, 0.25], [0, 0.25]],
-  cognac: [[0, 0], [0.044, 0], [0.046, 0.01], [0.046, 0.15], [0.03, 0.18], [0.016, 0.2], [0.015, 0.245], [0, 0.245]],
+// Blocky, like everything else in the game (box bodies, box heads): a square body, a square neck,
+// a cap and a label band. [body w, body h, neck w, neck h, label y0, label y1] in metres.
+const SHAPES = {
+  vodka: [0.065, 0.2, 0.026, 0.09, 0.06, 0.15],
+  beer: [0.06, 0.15, 0.026, 0.09, 0.04, 0.11],
+  cognac: [0.085, 0.15, 0.026, 0.08, 0.04, 0.12],
 };
-const LABEL = { vodka: [0.07, 0.15, 0.037], beer: [0.05, 0.11, 0.034], cognac: [0.06, 0.12, 0.047] }; // [y0, y1, r]
-const lathe = {};
-const bottleGeo = (kind) => (lathe[kind] ??= new THREE.LatheGeometry(PROFILES[kind].map(([r, y]) => new THREE.Vector2(r, y)), 12));
-const labelGeo = (kind) => {
-  const [y0, y1, r] = LABEL[kind];
-  return new THREE.CylinderGeometry(r, r, y1 - y0, 12, 1, true).translate(0, (y0 + y1) / 2, 0);
-};
+const box = (w, h, d, x, y, z) => new THREE.BoxGeometry(w, h, d).translate(x, y + h / 2, z);
 
 export const GLASS = {
-  clear: () => new THREE.MeshStandardMaterial({ color: '#d6e6ea', roughness: 0.06, metalness: 0.15, transparent: true, opacity: 0.6 }),
-  brown: () => mat('#4a2208', { roughness: 0.15, metalness: 0.1 }),
-  green: () => mat('#1d4f26', { roughness: 0.15, metalness: 0.1 }),
-  amber: () => mat('#7a3d0e', { roughness: 0.12, metalness: 0.1 }),
+  clear: () => mat('#c6dbe2', { roughness: 0.25, metalness: 0.1 }),
+  brown: () => mat('#5a2c0e', { roughness: 0.3 }),
+  green: () => mat('#2a5f2e', { roughness: 0.3 }),
+  amber: () => mat('#8a4512', { roughness: 0.3 }),
+  cap: () => mat('#2a2a2e', { roughness: 0.6 }),
 };
+
+// one bottle as its own Group, standing on its bottom (table, hands); same shape as the shelf ones
+const LOOK = { vodka: ['clear', 'paper'], beer: ['brown', 'gold'], cognac: ['amber', 'gold'] };
+const mats = {};
+const labelMat = { paper: () => mat('#ece6d6', { roughness: 0.9 }), gold: () => mat('#c9a23a', { roughness: 0.6 }), red: () => mat('#a8202a', { roughness: 0.7 }) };
+export function blockyBottle(kind = 'beer') {
+  const b = new Batch();
+  const [glass, label] = LOOK[kind] ?? LOOK.beer;
+  b.bottle(kind in SHAPES ? kind : 'beer', glass, label, 0, 0, 0);
+  const g = new THREE.Group();
+  for (const [key, geos] of b.parts) {
+    const m = (mats[key] ??= GLASS[key]?.() ?? labelMat[key]());
+    for (const geo of geos) g.add(new THREE.Mesh(geo, m));
+  }
+  return g;
+}
 
 // a bucket of geometries per material name; the caller merges and adds them
 export class Batch {
@@ -37,8 +49,11 @@ export class Batch {
     this.parts.get(key).push(geo);
   }
   bottle(kind, glass, label, x, y, z) {
-    this.put(glass, bottleGeo(kind).clone().translate(x, y, z));
-    this.put(label, labelGeo(kind).translate(x, y, z));
+    const [bw, bh, nw, nh, l0, l1] = SHAPES[kind];
+    this.put(glass, box(bw, bh, bw, x, y, z));
+    this.put(glass, box(nw, nh, nw, x, y + bh, z));
+    this.put('cap', box(nw + 0.006, 0.018, nw + 0.006, x, y + bh + nh, z));
+    this.put(label, box(bw + 0.004, l1 - l0, bw + 0.004, x, y + l0, z));
   }
 }
 

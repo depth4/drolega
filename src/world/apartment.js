@@ -168,6 +168,7 @@ export function buildApartment() {
     const [x, z] = room.lamp;
     const light = new THREE.PointLight(room.lampColor ?? '#ffd7a0', 9 * (room.lampPower ?? 1), 0, 1.6);
     light.position.set(x, H - 0.45, z);
+    light.userData.zone = room.id === 'landing' ? 'out' : 'flat'; // the landing is the stairwell
     group.add(light);
     lights.push(light);
     const halo = T.glowSprite(room.lampColor ?? '#ffd7a0', room.chandelier ? 0.9 : 0.6);

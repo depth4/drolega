@@ -31,10 +31,12 @@ function item(type) {
     g.add(new THREE.Mesh(new THREE.CylinderGeometry(0.045, 0.04, 0.035, 16).rotateX(Math.PI / 2).translate(0, 0.015, -0.18), metal));
   } else if (type === 'cat') {
     // the cat curled up in his arms
+    // lying across the arms, low on the screen: side on, head to the left, legs tucked in
     const c = makeCat({ label: false }).root;
-    c.scale.setScalar(1.2);
-    c.rotation.set(0, Math.PI * 0.6, 0);
-    c.position.set(-0.12, -0.12, -0.05);
+    c.traverse((o) => o.isMesh && o.geometry.parameters?.radiusTop === 0.018 && (o.visible = false)); // legs
+    c.scale.setScalar(0.75);
+    c.rotation.set(0, -Math.PI / 2, 0);
+    c.position.set(-0.16, -0.24, -0.08);
     g.add(c);
   } else if (type === 'pelmeni') {
     // a pack of frozen pelmeni

@@ -4,11 +4,13 @@
 // (hidden, so the shaders never see them); each frame the pool copies the ones
 // nearest to the viewer (and in front of him), fading a lamp in and out when it gains or loses a slot.
 // The light count never changes, so nothing recompiles mid-game.
+// There are no shadows, so a bright flat lamp "shines" through walls: lamps on the other side of
+// the flat's walls from the viewer (userData.zone vs zoneOf) count for little.
 import * as THREE from 'three';
 
 const FADE = 3; // 1/s
 
-export function createLightPool(scene, size = 6) {
+export function createLightPool(scene, size = 6, zoneOf = null) {
   const slots = Array.from({ length: size }, () => {
     const l = new THREE.PointLight('#000', 0, 1, 2);
     l.userData.pooled = true;
@@ -42,6 +44,7 @@ export function createLightPool(scene, size = 6) {
         const v = (views[i] ??= { pos: new THREE.Vector3(), frustum: new THREE.Frustum() });
         c.updateMatrixWorld();
         c.getWorldPosition(v.pos);
+        v.zone = zoneOf?.(v.pos) ?? null;
         v.frustum.setFromProjectionMatrix(m.multiplyMatrices(c.projectionMatrix, c.matrixWorldInverse));
       });
       views.length = cams.length;
@@ -56,7 +59,8 @@ export function createLightPool(scene, size = 6) {
           // a lamp whose light can't reach anything on screen counts for much less
           sphere.set(p, o.distance > 0 ? o.distance * 0.7 : 5);
           const seen = v.frustum.intersectsSphere(sphere) ? 1 : 0.25;
-          best = Math.max(best, (seen * o.intensity) / Math.pow(1 + d, 1.6));
+          const here = !o.userData.zone || !v.zone || o.userData.zone === v.zone ? 1 : 0.08;
+          best = Math.max(best, (seen * here * o.intensity) / Math.pow(1 + d, 1.6));
         }
         if (best > 0) score.set(o, best);
       }

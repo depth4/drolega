@@ -1,6 +1,7 @@
 // Low-poly people, the cat, floating labels and small props (puddles, toy, table bottles).
 // People face local +z (Object3D.lookAt points +z at the target).
 import * as THREE from 'three';
+import { blockyBottle } from './goods.js';
 import { mat } from './apartment.js';
 import { drawFace, faceAspect, hasMoodFaces, moodState, moodFace } from './faces.js';
 import { createRig } from './anim.js';
@@ -435,12 +436,7 @@ export function makeBucket() {
 }
 
 export function makeBottle(kind) {
-  const g = new THREE.Group();
-  const color = kind === 'vodka' ? '#dfe9ee' : '#3c6e2d';
-  const glass = new THREE.MeshStandardMaterial({ color, roughness: 0.1, metalness: 0.1, transparent: true, opacity: 0.85 });
-  g.add(new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.035, 0.2, 10).translate(0, 0.1, 0), glass));
-  g.add(new THREE.Mesh(new THREE.CylinderGeometry(0.012, 0.03, 0.08, 10).translate(0, 0.24, 0), glass));
-  return g;
+  return new THREE.Group().add(blockyBottle(kind === 'vodka' ? 'vodka' : 'beer'));
 }
 
 export function makePlate() {

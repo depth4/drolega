@@ -113,7 +113,8 @@ export function buildOutside() {
   // the building under the stairwell, so it doesn't float in the dollhouse view
   pbox(group, 8.3, 10.9, -9, STREET - 0.2, -0.42, TOP[1], mat('#3a3834'));
   for (const [z, y] of [[0.5, -0.4], [3.2, L1 + 1.6]]) {
-    const l = new THREE.PointLight('#d8f0c8', 2.5, 7, 1.6);
+    const l = new THREE.PointLight('#d8f0c8', 4, 9, 1.5);
+    l.userData.zone = 'out';
     const [lx0, lz0] = P.pt(9.6, z);
     l.position.set(lx0, y, lz0);
     group.add(l);
@@ -139,6 +140,7 @@ export function buildOutside() {
     pbox(group, x - 0.06, x + 0.06, STREET, STREET + 4.2, z - 0.06, z + 0.06, railMat);
     pbox(group, x - 0.25, x + 0.25, STREET + 4.1, STREET + 4.25, z - 0.15, z + 0.15, new THREE.MeshBasicMaterial({ color: '#ffd59a' }));
     const l = new THREE.PointLight('#ffb866', 18, 10, 1.4); // short range: no shadows, so it must not reach into the flat
+    l.userData.zone = 'out';
     const [wx, wz] = P.pt(x, z);
     l.position.set(wx, STREET + 4, wz);
     group.add(l);
@@ -198,6 +200,7 @@ export function buildOutside() {
   roof.lookAt(rx, STREET + 3.9, rz + 5); // tipped up towards the windows
   group.add(roof);
   const shopLight = new THREE.PointLight('#f4f8ff', 6, 10, 1.2);
+  shopLight.userData.zone = 'out';
   const [lx, lz] = P.pt(cx, (S.z0 + S.z1) / 2);
   shopLight.position.set(lx, STREET + 2.3, lz);
   group.add(shopLight);
@@ -207,7 +210,7 @@ export function buildOutside() {
   wall(S.x0 + 0.6, S.x1 - 0.6, S.z0 + 1.0, S.z0 + 1.4);
   const shelves = [];
   const MATS = {
-    clear: GLASS.clear(), brown: GLASS.brown(), green: GLASS.green(), amber: GLASS.amber(),
+    clear: GLASS.clear(), brown: GLASS.brown(), green: GLASS.green(), amber: GLASS.amber(), cap: GLASS.cap(),
     paper: mat('#ece6d6', { roughness: 0.9 }), gold: mat('#c9a23a', { roughness: 0.6 }), red: mat('#a8202a', { roughness: 0.7 }), blue: mat('#2a4a8a', { roughness: 0.7 }),
     pelmeni: new THREE.MeshStandardMaterial({ map: pelmeniPack(), roughness: 0.6 }),
     chips: new THREE.MeshStandardMaterial({ map: chipsBag(), roughness: 0.45 }),
