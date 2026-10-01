@@ -4,7 +4,8 @@
 import * as THREE from 'three';
 import { mat } from './apartment.js';
 import { makeProp } from './anim.js';
-import { makePlate, makeToy, makeCat, makeBucket } from './figures.js';
+import { makePlate, makeToy, makeBucket } from './figures.js';
+import { moodFace, hasMoodFaces } from './faces.js';
 
 function item(type) {
   const g = new THREE.Group();
@@ -29,15 +30,6 @@ function item(type) {
     const metal = mat('#b9bec4', { metalness: 0.7, roughness: 0.3 });
     g.add(new THREE.Mesh(new THREE.CylinderGeometry(0.016, 0.02, 0.2, 10).rotateX(Math.PI / 2).translate(0, 0, -0.06), metal));
     g.add(new THREE.Mesh(new THREE.CylinderGeometry(0.045, 0.04, 0.035, 16).rotateX(Math.PI / 2).translate(0, 0.015, -0.18), metal));
-  } else if (type === 'cat') {
-    // the cat curled up in his arms
-    // lying across the arms, low on the screen: side on, head to the left, legs tucked in
-    const c = makeCat({ label: false }).root;
-    c.traverse((o) => o.isMesh && o.geometry.parameters?.radiusTop === 0.018 && (o.visible = false)); // legs
-    c.scale.setScalar(0.75);
-    c.rotation.set(0, -Math.PI / 2, 0);
-    c.position.set(-0.16, -0.24, -0.08);
-    g.add(c);
   } else if (type === 'pelmeni') {
     // a pack of frozen pelmeni
     g.add(new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.22, 0.05).translate(0, 0.08, 0), mat('#e8eef8', { roughness: 0.6 })));
@@ -58,6 +50,76 @@ function item(type) {
   return g;
 }
 
+// The cat in Oleg's arms: not the floor cat shrunk, but a cat made for this view. A round fluffy body
+// across the bottom of the screen, his real face turned to Oleg, the tail hanging over the right arm,
+// both forearms under him. He breathes and flicks the tail.
+function heldCat() {
+  const g = new THREE.Group();
+  const fur = mat('#231b17', { roughness: 1 });
+  const furLight = mat('#3a2e27', { roughness: 1 });
+  const ball = (r, sx, sy, sz, x, y, z, m = fur) => {
+    const o = new THREE.Mesh(new THREE.SphereGeometry(r, 14, 10), m);
+    o.scale.set(sx, sy, sz);
+    o.position.set(x, y, z);
+    return o;
+  };
+  const body = new THREE.Group();
+  body.add(ball(1, 0.2, 0.12, 0.14, 0.03, 0, 0));
+  for (const [x, y, z, r] of [[0.15, 0.02, 0.02, 0.075], [-0.06, 0.04, 0.03, 0.08], [0.07, 0.06, -0.02, 0.07], [-0.12, -0.01, 0.05, 0.07]]) body.add(ball(r, 1, 0.9, 1, x, y, z, Math.random() < 0.5 ? fur : furLight));
+  g.add(body);
+  // the head: a dark fluffy ball, his photo face on the front
+  const head = new THREE.Group();
+  head.position.set(-0.17, 0.07, 0.06);
+  head.add(ball(0.09, 1, 0.92, 0.9, 0, 0, -0.01));
+  if (hasMoodFaces('cat')) {
+    moodFace('cat', 'default').then((f) => {
+      const tex = new THREE.CanvasTexture(f.canvas);
+      tex.colorSpace = THREE.SRGBColorSpace;
+      const h = 0.22;
+      const face = new THREE.Mesh(new THREE.PlaneGeometry(h * f.aspect, h), new THREE.MeshBasicMaterial({ map: tex, transparent: true, alphaTest: 0.05 }));
+      face.position.set(0, 0.02, 0.06);
+      face.renderOrder = 101;
+      face.material.depthTest = false;
+      face.material.depthWrite = false;
+      head.add(face);
+    });
+  }
+  g.add(head);
+  // the tail over the right forearm, in three segments so it can curl
+  const tail = new THREE.Group();
+  tail.position.set(0.21, 0.01, 0);
+  let seg = tail;
+  const segs = [];
+  for (let i = 0; i < 3; i++) {
+    const s2 = new THREE.Group();
+    s2.add(ball(0.035 - i * 0.006, 1, 2.2, 1, 0, -0.06, 0));
+    s2.position.y = i ? -0.11 : 0;
+    s2.rotation.z = 0.5;
+    seg.add(s2);
+    segs.push(s2);
+    seg = s2;
+  }
+  g.add(tail);
+  // Oleg's forearms under him
+  const sleeve = mat('#3a3f52'), skin = mat('#e2b594', { roughness: 0.7 });
+  for (const [sx, ry] of [[-1, 0.5], [1, -0.4]]) {
+    const fa = new THREE.Group();
+    fa.position.set(sx * 0.28, -0.13, 0.12);
+    fa.rotation.set(0.2, ry, 0);
+    fa.add(new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.09, 0.4).translate(0, 0, 0.05), sleeve));
+    fa.add(new THREE.Mesh(new THREE.BoxGeometry(0.11, 0.06, 0.12).translate(-sx * 0.02, 0.02, -0.19), skin));
+    g.add(fa);
+  }
+  g.userData.anim = (t) => {
+    body.scale.y = 1 + Math.sin(t * 2.2) * 0.04; // breathing
+    head.rotation.z = Math.sin(t * 0.7) * 0.08;
+    head.rotation.y = Math.sin(t * 0.43) * 0.15;
+    const flick = Math.max(0, Math.sin(t * 0.9)) ** 6;
+    segs.forEach((sg, i) => (sg.rotation.z = 0.45 + Math.sin(t * 1.6 - i * 0.7) * 0.15 + flick * 0.5 * (i + 1)));
+  };
+  return g;
+}
+
 export function createViewmodel(camera) {
   const root = new THREE.Group();
   camera.add(root);
@@ -70,6 +132,10 @@ export function createViewmodel(camera) {
   const holder = new THREE.Group();
   holder.position.set(0, 0.03, -0.03);
   arm.add(holder);
+  const cat = heldCat(); // the cat is held with both arms: its own rig instead of the one-hand arm
+  cat.visible = false;
+  root.add(cat);
+  let catT = 0;
 
   const items = {};
   let current = null, shown = null;
@@ -89,6 +155,7 @@ export function createViewmodel(camera) {
       m.renderOrder = 100;
     });
   noDepth(arm);
+  noDepth(cat);
 
   const tipLocal = new THREE.Vector3(0, 0.015, -0.21);
   const act = { spray: 0, scrub: 0, shake: 0, sx: 0, sy: 0 };
@@ -122,12 +189,12 @@ export function createViewmodel(camera) {
       if (swap < 0.5 && shown !== current) {
         if (shown && items[shown]) items[shown].visible = false;
         shown = current;
-        if (shown && !items[shown]) {
+        if (shown && shown !== 'cat' && !items[shown]) {
           items[shown] = item(shown);
           noDepth(items[shown]);
           holder.add(items[shown]);
         }
-        if (shown) items[shown].visible = true;
+        if (shown && items[shown]) items[shown].visible = true;
       }
       const lowered = Math.sin(Math.min(1, swap) * Math.PI);
       // bob while walking, breathe while standing
@@ -174,6 +241,17 @@ export function createViewmodel(camera) {
         -0.42 + az - act.spray * 0.1 - (act.scrub > 0 ? 0.1 : 0),
       );
       arm.rotation.set(0.12 + rx - act.spray * 0.15 + (act.scrub > 0 ? -0.6 : 0), -0.18 + act.spray * 0.1, rz + Math.sin(bob * 0.25) * d * 0.1);
+      // holding the cat: both arms, the one-hand arm is out of the way
+      const holding = shown === 'cat';
+      cat.visible = holding;
+      arm.visible = !holding;
+      if (holding) {
+        catT += dt;
+        cat.userData.anim(catT);
+        cat.position.set(0.02 + bx * 0.6 + lag.x * 0.6, -0.27 - by * 0.7 - lowered * 0.35 + lag.y * 0.6 + (anim ? 0.04 * Math.sin(Math.min(1, anim.t / anim.dur) * Math.PI) : 0), -0.7);
+        cat.scale.setScalar(0.85);
+        cat.rotation.set(0.35, 0.08 + Math.sin(bob * 0.3) * d * 0.05, Math.sin(bob * 0.5) * 0.02);
+      }
     },
   };
 }

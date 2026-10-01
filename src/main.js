@@ -17,6 +17,7 @@ import { iconURL } from './ui/icons.js';
 import * as audio from './audio.js';
 import { TUNE, BIRTHDAY } from './config.js';
 import { createLightPool } from './world/lightpool.js';
+import { createFilters } from './filters.js';
 
 const params = new URLSearchParams(location.search);
 const $ = (id) => document.getElementById(id);
@@ -56,6 +57,19 @@ const hands = createViewmodel(camera);
 let mirror = null; // created at boot, once the head style is known
 let phoneBob = 0;
 const fx = makeFX(renderer, scene, camera);
+// "Oleg's eyes": full-screen looks, V cycles (Shift+V back), remembered in the browser
+const filters = createFilters(fx.composer, $('filter-ov'));
+filters.setSize(innerWidth, innerHeight, renderer.getPixelRatio());
+let filterNameT = null;
+function nextFilter(step = 1) {
+  const f = filters.next(step);
+  $('btn-filter').textContent = `Глаза Олега: ${f.name}`;
+  const n = $('filter-name');
+  n.textContent = `${f.name} · V — следующий`;
+  n.classList.add('on');
+  clearTimeout(filterNameT);
+  filterNameT = setTimeout(() => n.classList.remove('on'), 1600);
+}
 game.attachOutside(outside);
 const hud = createHUD({ onBuy: (cart) => game.buyCart(cart) });
 // close-up hands-on scenes (pelmeni): the mouse is free, the camera flies in, the world slows down
@@ -216,6 +230,8 @@ for (const b of document.querySelectorAll('#night-pick [data-night]')) {
   });
 }
 $('btn-orbit').addEventListener('click', toOrbit);
+$('btn-filter').addEventListener('click', () => nextFilter());
+$('btn-filter').textContent = `Глаза Олега: ${filters.current.name}`;
 
 $('btn-back').addEventListener('click', pause);
 $('btn-next').addEventListener('click', () => {
@@ -317,6 +333,7 @@ addEventListener('wheel', (e) => mode === 'play' && game.inv.select(game.inv.sel
 
 let currentActions = [];
 addEventListener('keydown', (e) => {
+  if (e.code === 'KeyV' && !e.repeat && (mode === 'play' || mode === 'menu' || mode === 'end')) return nextFilter(e.shiftKey ? -1 : 1);
   if (mode !== 'play') return;
   player.keys.add(e.code);
   if (e.repeat) return;
@@ -353,6 +370,7 @@ addEventListener('blur', () => player.keys.clear());
 addEventListener('resize', () => {
   renderer.setSize(innerWidth, innerHeight);
   fx.setSize(innerWidth, innerHeight);
+  filters.setSize(innerWidth, innerHeight, renderer.getPixelRatio());
   for (const c of [camera, orbitCam]) {
     c.aspect = innerWidth / innerHeight;
     c.updateProjectionMatrix();
@@ -499,6 +517,7 @@ function frame(now) {
   drunkFx += ((mode === 'play' ? game.oleg.drunk / 100 : 0) - drunkFx) * Math.min(1, dt * 2);
   blackFx += ((mode === 'play' && game.oleg.blackout > 0 ? 1 : 0) - blackFx) * Math.min(1, dt * 3);
   fx.set(time, drunkFx, blackFx);
+  filters.update(time, game.clock);
 
   lightPool.update(dt, mode === 'play' && hud.camRect() ? [camera, doorCam] : [mode === 'orbit' ? orbitCam : camera]);
   if (mode === 'orbit') renderer.render(scene, orbitCam);

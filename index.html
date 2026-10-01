@@ -10,6 +10,8 @@
   </head>
   <body>
     <div id="app"></div>
+    <div id="filter-ov" class="filter-ov" hidden></div>
+    <div id="filter-name" class="filter-name"></div>
 
     <div id="hud" hidden>
       <div class="hud-tl">
@@ -40,7 +42,7 @@
       <div class="use" id="use" hidden><span id="use-label"></span><div class="bar"><i id="use-bar"></i></div></div>
       <div class="hand-name" id="hand-name"></div>
       <div class="hotbar" id="hotbar"></div>
-      <div class="keys-hint">F телефон · C фото · Q выпить · G положить</div>
+      <div class="keys-hint">F телефон · C фото · Q выпить · G положить · V фильтр</div>
       <div class="blackout" id="blackout" hidden>Олег вырубился…</div>
       <div class="viewfinder" id="viewfinder" hidden><i></i><i></i><i></i><i></i><span id="vf-count">0/3</span><small>ЛКМ — снять · C — убрать камеру</small></div>
       <div class="flash" id="flash"></div>
@@ -79,6 +81,7 @@
         <div class="menu-buttons">
           <button id="btn-play" class="primary" type="button">Начать ночь 1</button>
           <button id="btn-orbit" type="button">Посмотреть хату сверху</button>
+          <button id="btn-filter" type="button">Глаза Олега</button>
         </div>
         <div class="night-pick" id="night-pick">
           <span>Сразу в ночь</span>
@@ -90,6 +93,7 @@
           <div><dt>E / R / T</dt><dd>действия (подсказка у прицела)</dd></div>
           <div><dt>1–4</dt><dd>слот инвентаря, Q — выпить самому</dd></div>
           <div><dt>F</dt><dd>телефон: камера у двери и доставка</dd></div>
+          <div><dt>V</dt><dd>фильтр «глаза Олега»: VHS, бодикам, PS1…</dd></div>
         </dl>
       </div>
     </div>
