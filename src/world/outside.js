@@ -7,6 +7,7 @@ import * as THREE from 'three';
 import { H, planToWorld as P, worldToPlan } from './layout.js';
 import { mat, boxGeo, worldUV } from './apartment.js';
 import * as T from './textures.js';
+import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 
 // Khrushchevka stairwell, Oleg on the 2nd floor. Out of his door onto the landing, then towards the
 // front of the house: a flight down to the half landing, a flight back to the 1st-floor landing (right
@@ -162,7 +163,9 @@ export function buildOutside() {
   kw(S.x0, S.x1, S.z0, S.z0 + 0.15);
   kw(S.x0, S.x0 + 0.15, S.z0, S.z1);
   kw(S.x1 - 0.15, S.x1, S.z0, S.z1);
-  pbox(group, S.x0, S.x1, STREET + 2.6, STREET + 2.75, S.z0, S.z1, mat('#5a5650'));
+  pbox(group, S.x0, S.x1, STREET + 2.6, STREET + 2.75, S.z0, S.z1, mat('#d4d2cc', { emissive: '#5c5c58' })); // lit by the tubes right under it
+  const tube = new THREE.MeshBasicMaterial({ color: '#f4fbff', toneMapped: false }); // the fluorescent tubes of every 24/7 shop
+  for (const tx of [S.x0 + 1.4, S.x1 - 1.4]) pbox(group, tx - 0.04, tx + 0.04, STREET + 2.54, STREET + 2.6, S.z0 + 0.9, S.z1 - 0.9, tube);
   pbox(group, S.x0 + 0.15, S.x1 - 0.15, STREET, STREET + 0.01, S.z0 + 0.15, S.z1 - 0.15, new THREE.MeshStandardMaterial({ map: T.floorTile(), roughness: 0.8 }), 1);
   const sign = document.createElement('canvas');
   sign.width = 512;
@@ -204,14 +207,15 @@ export function buildOutside() {
     const r = P.rect(x0, x1, z0, z1);
     const alongX = r.x1 - r.x0 > r.z1 - r.z0;
     const len = alongX ? r.x1 - r.x0 : r.z1 - r.z0, dep = alongX ? r.z1 - r.z0 : r.x1 - r.x0;
+    const boxes = [];
     for (let row = 0; row < 4; row++)
       for (let k = 0; k < 6; k++) {
         const w = len / 6;
-        const m = new THREE.Mesh(alongX ? new THREE.BoxGeometry(w * 0.7, 0.22, dep * 0.6) : new THREE.BoxGeometry(dep * 0.6, 0.22, w * 0.7), mat(color));
         const along = (alongX ? r.x0 : r.z0) + w * (k + 0.5);
-        m.position.set(alongX ? along : (r.x0 + r.x1) / 2, STREET + 0.35 + row * 0.42, alongX ? (r.z0 + r.z1) / 2 : along);
-        goods.add(m);
+        const g = alongX ? new THREE.BoxGeometry(w * 0.7, 0.22, dep * 0.6) : new THREE.BoxGeometry(dep * 0.6, 0.22, w * 0.7);
+        boxes.push(g.translate(alongX ? along : (r.x0 + r.x1) / 2, STREET + 0.35 + row * 0.42, alongX ? (r.z0 + r.z1) / 2 : along));
       }
+    goods.add(new THREE.Mesh(mergeGeometries(boxes), mat(color))); // one draw call per shelf
     group.add(goods);
     shelves.push({ id, label, mesh: unit, goods });
   };
@@ -223,18 +227,21 @@ export function buildOutside() {
   // behind the cashier: the wall of cigarettes, bottles and everything
   pbox(group, S.x0 + 0.3, S.x1 - 0.3, STREET, STREET + 2.2, S.z0 + 0.15, S.z0 + 0.55, mat('#5e544a'));
   const backGoods = ['#b3242a', '#e8e0c8', '#2f5fb8', '#3c6e2d', '#e0a21b', '#7a3a8a', '#dfe9ee'];
+  const byColor = new Map(); // merged per colour and kind: a dozen draw calls instead of 65
   for (let row = 0; row < 5; row++) {
     for (let k = 0; k < 13; k++) {
       const x = S.x0 + 0.45 + k * 0.28, bottle = row < 2;
       const [bx, bz] = P.pt(x, S.z0 + 0.58);
-      const m = bottle
-        ? new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.04, 0.3, 8), mat(backGoods[(k + row * 3) % backGoods.length], { roughness: 0.2 }))
-        : new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.12, 0.06), mat(backGoods[(k * 2 + row) % backGoods.length]));
-      m.position.set(bx, STREET + 0.45 + row * 0.38 + (bottle ? 0.15 : 0.06), bz);
-      group.add(m);
+      const color = backGoods[(bottle ? k + row * 3 : k * 2 + row) % backGoods.length];
+      const g = bottle ? new THREE.CylinderGeometry(0.035, 0.04, 0.3, 8) : new THREE.BoxGeometry(0.2, 0.12, 0.06);
+      g.translate(bx, STREET + 0.45 + row * 0.38 + (bottle ? 0.15 : 0.06), bz);
+      const key = `${color}${bottle ? 'b' : ''}`;
+      if (!byColor.has(key)) byColor.set(key, []);
+      byColor.get(key).push(g);
     }
     pbox(group, S.x0 + 0.3, S.x1 - 0.3, STREET + 0.4 + row * 0.38, STREET + 0.43 + row * 0.38, S.z0 + 0.15, S.z0 + 0.7, mat('#4a4038'));
   }
+  for (const [key, geos] of byColor) group.add(new THREE.Mesh(mergeGeometries(geos), mat(key.slice(0, 7), key.endsWith('b') ? { roughness: 0.2 } : {})));
   const shopDoor = { ...P.rect(S.door[0], S.door[1], S.z1 - 0.2, S.z1 + 0.05), enabled: false };
   colliders.push(shopDoor);
   const cashier = P.pt(cx, S.z0 + 0.75);
