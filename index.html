@@ -13,19 +13,25 @@
 
     <div id="hud" hidden>
       <div class="hud-tl">
-        <div class="clock"><span id="night">НОЧЬ 1</span><b id="time">22:00</b><span class="room" id="room"></span></div>
+        <div class="clock">
+          <div class="lcd"><span class="ghost">88:88</span><b id="time">22:00</b></div>
+          <div class="clock-sub"><span id="night">НОЧЬ 1</span><span class="room" id="room"></span></div>
+        </div>
         <div class="courier-chip" id="courier-chip" hidden></div>
-        <section class="panel crew"><h3>Пацаны</h3><div id="people"></div></section>
+        <div class="crew" id="people"></div>
       </div>
       <section class="panel hud-tr">
         <div class="stat"><label>Веселье</label><div class="bar fun"><i id="bar-total"></i></div></div>
         <div class="stat"><label>Хата</label><div class="bar hut"><i id="bar-hut"></i></div></div>
         <div class="stat"><label>Соседи<em id="anger"></em></label><div class="bar noise"><i id="bar-noise"></i></div></div>
       </section>
-      <section class="panel oleg">
-        <h3>Олег <em id="othirst" hidden>хочет выпить</em></h3>
-        <div class="stat"><label>Веселье</label><div class="bar ofun"><i id="bar-ofun"></i></div></div>
-        <div class="stat"><label>Силы</label><div class="bar energy"><i id="bar-energy"></i></div></div>
+      <section class="oleg">
+        <div class="ava big" id="oleg-ava"><img alt=""></div>
+        <div class="oleg-meters">
+          <div class="oleg-name">Олег <em id="othirst" hidden>хочет выпить</em></div>
+          <div class="stat"><label>Веселье</label><div class="bar ofun"><i id="bar-ofun"></i></div></div>
+          <div class="stat"><label>Силы</label><div class="bar energy"><i id="bar-energy"></i></div></div>
+        </div>
       </section>
       <div class="toasts" id="toasts"></div>
       <div class="door-alert" id="door-alert" hidden>Стучат в дверь · F — камера</div>
@@ -66,9 +72,10 @@
 
     <div id="menu">
       <div class="menu-card">
-        <p class="eyebrow">Хрущёвка · 2 комнаты · 43 м²</p>
-        <h1>5 ночей<br /><span>на хате у Олега</span></h1>
-        <p class="lead">Ты — Олег. Пацаны пришли бухать. Держи общее веселье выше нуля, хату — целой, кота — живым. До 06:00.</p>
+        <p class="eyebrow">Хрущёвка · 2 комнаты · 2-й этаж</p>
+        <h1>5 ночей<span>на хате у Олега</span></h1>
+        <div class="menu-lcd"><div class="lcd"><span class="ghost">88:88</span><b>22:00</b></div><small>до 06:00</small></div>
+        <p class="lead">Ты — Олег, у тебя на хате пацаны. Тусуйся сам и держи общее веселье выше нуля, хату — целой, кота — живым.</p>
         <div class="menu-buttons">
           <button id="btn-play" class="primary" type="button">Начать ночь 1</button>
           <button id="btn-orbit" type="button">Посмотреть хату сверху</button>

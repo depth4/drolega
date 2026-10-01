@@ -74,6 +74,7 @@ export function createViewmodel(camera) {
   let swap = 0; // 0..1 lowered while switching
   let anim = null; // { name, t, dur }
   let bob = 0;
+  let away = 1; // empty hands drop out of view; they come up only to do something
   let lastYaw = null, lastPitch = null;
   const lag = { x: 0, y: 0 };
 
@@ -160,13 +161,14 @@ export function createViewmodel(camera) {
         if (anim.t >= anim.dur) anim = null;
       }
       const empty = !shown;
+      away += ((empty && !act.shake && !anim ? 1 : 0) - away) * Math.min(1, dt * 8);
       const d = drunk / 100;
       // hands-on motions: push forward to spray, follow the mouse when scrubbing or shaking someone
       const hx = (act.scrub > 0 || act.shake > 0 ? act.sx : 0) + act.shake * Math.sin(bob * 12) * 0.03;
       const hy = (act.scrub > 0 ? -act.sy - 0.12 : 0) + (empty && act.shake > 0 ? 0.1 : 0);
       arm.position.set(
         0.24 + bx + lag.x + ax + hx - act.spray * 0.08 + Math.sin(bob * 0.3) * d * 0.03,
-        -0.26 - by - lowered * 0.3 + lag.y + ay - (empty && !act.shake ? 0.12 : 0) + hy + act.spray * 0.06,
+        -0.26 - by - lowered * 0.3 + lag.y + ay - away * 0.4 + hy + act.spray * 0.06,
         -0.42 + az - act.spray * 0.1 - (act.scrub > 0 ? 0.1 : 0),
       );
       arm.rotation.set(0.12 + rx - act.spray * 0.15 + (act.scrub > 0 ? -0.6 : 0), -0.18 + act.spray * 0.1, rz + Math.sin(bob * 0.25) * d * 0.1);

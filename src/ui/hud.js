@@ -2,9 +2,30 @@
 import { TUNE } from '../config.js';
 import { ITEMS } from '../game/game.js';
 import { iconURL, iconImg, hasRealIcon } from './icons.js';
+import { moodFace, moodState } from '../world/faces.js';
 
 const $ = (id) => document.getElementById(id);
 const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
+
+// round portraits for the HUD, cut from the same mood pictures the heads use
+const avatars = {};
+function avatar(who, state) {
+  const st = moodState(who, state) ?? 'default';
+  const key = `${who}_${st}`;
+  if (key in avatars) return avatars[key];
+  avatars[key] = null;
+  moodFace(who, st).then((f) => {
+    const n = 96, c = document.createElement('canvas');
+    c.width = c.height = n;
+    const g = c.getContext('2d');
+    const src = f.canvas, k = Math.max(n / src.width, n / src.height) * 1.08; // fill the circle, chin may crop
+    g.drawImage(src, (n - src.width * k) / 2, n * 0.04, src.width * k, src.height * k);
+    avatars[key] = c.toDataURL();
+  });
+  return null;
+}
+// fun 0..100 -> ring colour, red through amber to green
+const funColor = (v) => `hsl(${Math.round(Math.max(0, Math.min(100, v)) * 1.15)} 75% 55%)`;
 
 export function createHUD({ onBuy }) {
   const el = {
@@ -88,7 +109,16 @@ export function createHUD({ onBuy }) {
   el.tabCam.addEventListener('click', () => tab('cam'));
   el.tabShop.addEventListener('click', () => tab('shop'));
 
-  const bar = (v, cls = '') => `<div class="bar ${cls} ${v < 25 ? 'low' : ''}"><i style="width:${Math.max(0, Math.min(100, v)).toFixed(0)}%"></i></div>`;
+  el.olegAva = $('oleg-ava');
+  const paint = (node, m, self = false) => {
+    const ava = self ? node : node.firstElementChild;
+    ava.style.setProperty('--v', `${Math.max(0, Math.min(100, m.fun)).toFixed(0)}%`);
+    ava.style.setProperty('--c', funColor(m.fun));
+    node.classList.toggle('bad', m.bad);
+    const url = avatar(m.id, m.face);
+    const img = ava.firstElementChild;
+    if (url && img.getAttribute('src') !== url) img.src = url;
+  };
 
   return {
     el,
@@ -135,13 +165,16 @@ export function createHUD({ onBuy }) {
       el.ofun.parentElement.classList.toggle('low', game.oleg.fun < 25);
       el.othirst.hidden = game.oleg.thirst < TUNE.olegThirst.from; // Oleg wants a drink
 
-      // who needs Oleg: name, fun, and a "!" when something is wrong (what exactly — look at him)
-      const row = (name, fun, bad) => `<div class="row ${bad ? 'bad' : ''}"><span class="name">${esc(name)}</span><span class="badge ${bad ? '' : 'off'}">!</span>${bar(fun)}</div>`;
-      const rows = [
-        ...game.friends.map((f) => row(f.name, f.fun, !!f.problem)),
-        row('Кот', game.cat.gone ? 0 : game.cat.fun, !!(game.cat.gone || game.cat.problem)),
+      // who needs Oleg: face, a ring for his fun, and a "!" when something is wrong (what exactly — look at him)
+      const mates = [
+        ...game.friends.map((f) => ({ id: f.id, name: f.name, fun: f.fun, bad: !!f.problem, face: f.faceState() })),
+        { id: 'cat', name: 'Кот', fun: game.cat.gone ? 0 : game.cat.fun, bad: !!(game.cat.gone || game.cat.problem), face: 'default' },
       ];
-      set('people', el.people, rows.join(''));
+      if (el.people.childElementCount !== mates.length) {
+        el.people.innerHTML = mates.map((m) => `<div class="mate" data-id="${m.id}"><div class="ava"><img alt=""><i class="badge">!</i></div><span class="name">${esc(m.name)}</span></div>`).join('');
+      }
+      mates.forEach((m, i) => paint(el.people.children[i], m));
+      paint(el.olegAva, { id: 'oleg', fun: game.oleg.fun, bad: false, face: 'default' }, true);
 
       set('toasts', el.toasts, game.toasts.slice(-2).map((t) => `<div class="toast ${t.kind}">${t.room ? `<small>${esc(t.room)}</small>` : ''}${esc(t.text)}</div>`).join(''));
 

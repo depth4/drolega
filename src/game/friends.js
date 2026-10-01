@@ -1114,6 +1114,7 @@ export class Cat extends Walker {
     if (this.gone) return;
     const g = this.game, C = TUNE.cat;
     this.t += dt;
+    this.figure.showName?.(!this.carried && Math.hypot(g.olegPos[0] - this.pos[0], g.olegPos[1] - this.pos[1]) < 4.5); // like the guys: only up close
     if (this.carried) {
       this.pos = [...g.olegPos];
       this.fun = clamp(this.fun + C.heldFun * dt);

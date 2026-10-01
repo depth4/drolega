@@ -346,14 +346,18 @@ export function makeCat({ label = true } = {}) {
   tail.rotation.x = -0.6;
   body.add(tail);
 
+  let tag = null;
   if (label) {
-    const tag = textSprite('Кот', { size: 34 });
+    tag = textSprite('Кот', { size: 34 });
     tag.position.y = 0.6;
     root.add(tag);
   }
   let bubble = null, bubbleText = null;
   return {
     root,
+    showName(v) {
+      if (tag) tag.visible = v;
+    },
     setStatus(text) {
       if (!!text === !!bubbleText) return (bubbleText = text);
       bubbleText = text;

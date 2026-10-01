@@ -16,13 +16,14 @@ import { moodFace } from './world/faces.js';
 import { iconURL } from './ui/icons.js';
 import * as audio from './audio.js';
 import { TUNE, BIRTHDAY } from './config.js';
+import { createLightPool } from './world/lightpool.js';
 
 const params = new URLSearchParams(location.search);
 const $ = (id) => document.getElementById(id);
 
 // ---------- renderer & scene ----------
 const renderer = new THREE.WebGLRenderer({ antialias: true });
-renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.setPixelRatio(Math.min(devicePixelRatio, 1.5)); // retina at 2x costs 4x the pixels for little gain
 renderer.setSize(innerWidth, innerHeight);
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
 renderer.toneMappingExposure = 1.05;
@@ -73,6 +74,8 @@ window.__game = game; // handy in the console
 window.__player = player;
 window.__spots = SPOTS;
 window.__three = THREE; // debugging: raycasts from the console
+const lightPool = createLightPool(scene, 6);
+window.__renderer = renderer; window.__scene = scene;
 window.__tune = TUNE; // balance numbers, live
 window.__ragdoll = ragdoll; // physics debugging
 if (params.get('physics') === 'off') game.noPhysics = true; // debug: the old kinematic bodies
@@ -99,6 +102,10 @@ function show(id, v) {
   $(id).hidden = !v;
 }
 
+// the title screen shows the party until the first night starts
+let attract = !params.has('play') && !params.has('x');
+const MENU_SHOT = { x: 6.9, z: 7.0, yaw: 35 * (Math.PI / 180), pitch: -0.2 };
+
 function startNight(n) {
   game.startNight(n);
   setPhotoMode(false);
@@ -117,6 +124,10 @@ function lock() {
 
 function play() {
   audio.init();
+  if (attract) {
+    attract = false;
+    startNight(game.night); // the party behind the title was only for show
+  }
   if (!started || game.over) startNight(game.over?.win ? game.night + 1 : game.night);
   mode = 'play';
   show('menu', false);
@@ -157,6 +168,7 @@ function setPhone(open, relock = true) {
 }
 
 game.onEnd = (res) => {
+  if (attract) return startNight(game.night);
   mode = 'end';
   setPhone(false, false);
   document.exitPointerLock?.();
@@ -455,13 +467,23 @@ function frame(now) {
     audio.setMusic(false);
     audio.voices.stopAll();
     if (mode === 'orbit') orbit.update();
-    else if (mode === 'menu' || mode === 'end') player.update(0);
+    else if (mode === 'menu' && attract) {
+      // title screen: the party goes on by itself (no sound before the first click), seen from the corner
+      game.olegPos = [99, 99]; // no name tags
+      game.update(dt);
+      player.place(MENU_SHOT.x, MENU_SHOT.z, MENU_SHOT.yaw + Math.sin(time * 0.12) * 0.07);
+      player.pitch = MENU_SHOT.pitch;
+      player.update(0);
+    } else if (mode === 'menu' || mode === 'end') player.update(0);
   }
 
   drunkFx += ((mode === 'play' ? game.oleg.drunk / 100 : 0) - drunkFx) * Math.min(1, dt * 2);
   blackFx += ((mode === 'play' && game.oleg.blackout > 0 ? 1 : 0) - blackFx) * Math.min(1, dt * 3);
   fx.set(time, drunkFx, blackFx);
 
+  const views = [(mode === 'orbit' ? orbitCam : camera).getWorldPosition(new THREE.Vector3())];
+  if (mode === 'play' && hud.camRect()) views.push(doorCam.position);
+  lightPool.update(dt, views);
   if (mode === 'orbit') renderer.render(scene, orbitCam);
   else fx.render();
   if (snapRequested) {
@@ -513,5 +535,8 @@ if (params.has('play')) {
   const skip = Number(params.get('t')) || 0;
   for (let s = 0; s < skip; s += 0.05) game.update(0.05);
   if (params.has('phone')) setPhone(true, false);
+} else if (attract) {
+  game.olegPos = [99, 99];
+  for (let s = 0; s < 20; s += 0.05) game.update(0.05); // the guys have settled in by the time the title shows
 }
 requestAnimationFrame(frame);
