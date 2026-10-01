@@ -17,34 +17,48 @@
         <div class="room" id="room">Прихожая</div>
       </div>
       <div class="hud-tr">
-        <div class="meter"><label>Общее веселье</label><div class="bar fun"><i id="bar-total"></i></div></div>
-        <div class="meter"><label>Состояние хаты</label><div class="bar hut"><i id="bar-hut"></i></div></div>
-        <div class="meter"><label>Соседи <span id="anger"></span></label><div class="bar noise"><i id="bar-noise"></i></div></div>
+        <div class="meter" title="Общее веселье"><img id="ico-fun" alt=""><div class="bar fun"><i id="bar-total"></i></div></div>
+        <div class="meter" title="Состояние хаты"><img id="ico-hut" alt=""><div class="bar hut"><i id="bar-hut"></i></div></div>
+        <div class="meter" title="Соседи"><img id="ico-noise" alt=""><div class="bar noise"><i id="bar-noise"></i></div><span id="anger"></span></div>
       </div>
       <div class="people" id="people"></div>
       <div class="toasts" id="toasts"></div>
       <div class="door-alert" id="door-alert" hidden>Стучат в дверь · F — камера</div>
       <div class="crosshair"></div>
       <div class="prompt" id="prompt"></div>
+      <div class="use" id="use" hidden><span id="use-label"></span><div class="bar"><i id="use-bar"></i></div></div>
+      <div class="oleg-bars">
+        <div class="meter" title="Веселье Олега"><img id="ico-ofun" alt=""><div class="bar ofun"><i id="bar-ofun"></i></div><img id="ico-othirst" class="thirst" alt="" hidden></div>
+        <div class="meter" title="Силы Олега"><img id="ico-energy" alt=""><div class="bar energy"><i id="bar-energy"></i></div></div>
+      </div>
       <div class="hotbar" id="hotbar"></div>
-      <div class="keys-hint">F — телефон · Q — выпить/съесть самому · G — выбросить · 1–4 — слот</div>
+      <div class="keys-hint">F телефон · Q выпить / погладить кота · G положить</div>
       <div class="blackout" id="blackout" hidden>Олег вырубился…</div>
+      <div class="viewfinder" id="viewfinder" hidden><i></i><i></i><i></i><i></i><span id="vf-count">0/3</span><small>ЛКМ — снять · C — убрать камеру</small></div>
+      <div class="flash" id="flash"></div>
+      <figure class="polaroid" id="polaroid" hidden><img id="polaroid-img" alt=""><figcaption id="polaroid-cap"></figcaption></figure>
     </div>
 
     <div id="phone" hidden>
-      <div class="phone-top"><span id="phone-time">22:00</span><b id="phone-money">3000 ₽</b></div>
-      <div class="phone-tabs">
-        <button id="tab-cam" class="on" type="button">Камера</button>
-        <button id="tab-shop" type="button">Доставка</button>
+      <div class="phone-top"><span id="phone-time">22:00</span><span class="phone-money" id="phone-money">3000 ₽</span></div>
+      <div class="phone-screen">
+        <div class="phone-cam" id="phone-cam">
+          <div class="cam-view" id="cam-view"><canvas id="cam-canvas"></canvas><span class="rec">● REC · подъезд</span></div>
+          <div class="cam-who" id="cam-who">У двери никого</div>
+        </div>
+        <div class="phone-shop" id="phone-shop" hidden>
+          <div class="shop-card" id="shop-card"></div>
+          <div class="shop-dots" id="shop-dots"></div>
+          <div class="slide" id="slide"><div class="slide-fill" id="slide-fill"></div><span class="slide-text" id="slide-text">Сдвинь, чтобы заказать</span><div class="slide-knob" id="slide-knob"></div></div>
+          <div class="orders" id="orders"></div>
+        </div>
       </div>
-      <div class="phone-cam" id="phone-cam">
-        <div class="cam-view" id="cam-view"><canvas id="cam-canvas"></canvas><span class="rec">● REC · подъезд</span><span class="cam-who" id="cam-who">Никого</span></div>
+      <div class="phone-dock">
+        <button id="tab-cam" class="on" type="button"><img id="ico-cam" alt=""><span>Камера</span></button>
+        <button id="tab-shop" type="button"><img id="ico-shop" alt=""><span>Доставка</span></button>
+        <button id="tab-photo" type="button"><img id="ico-photo" alt=""><span>Снять (C)</span></button>
+        <button id="phone-close" type="button"><span class="x">✕</span><span>Убрать (F)</span></button>
       </div>
-      <div class="phone-shop" id="phone-shop" hidden>
-        <ul id="shop-list"></ul>
-        <div class="orders" id="orders"></div>
-      </div>
-      <button class="phone-close" id="phone-close" type="button">Убрать телефон (F)</button>
     </div>
 
     <div id="menu">
@@ -73,6 +87,7 @@
         <h1 id="end-title">06:00</h1>
         <p class="lead" id="end-reason"></p>
         <p class="stats" id="end-stats"></p>
+        <div class="end-photos" id="end-photos"></div>
         <div class="menu-buttons">
           <button id="btn-next" class="primary" type="button">Дальше</button>
           <button id="btn-menu" type="button">В меню</button>

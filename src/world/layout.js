@@ -165,6 +165,7 @@ const PLAN_SPOTS = {
   sofaB: { on: 'sofa', p: [2.95, 2.6], node: 'livingW', pose: 'sit', y: 0.08, look: [4, 2.6] },
   table1: { on: 'partyTable', p: [4.6, 2.35], node: 'livingE', look: [4.0, 2.5] }, // keep arms out of the TV
   table2: { on: 'partyTable', p: [4.0, 3.5], node: 'living', look: [4.0, 2.6] },
+  table3: { on: 'partyTable', p: [4.0, 1.72], node: 'livingN', look: [4.0, 2.6] },
   balcony: { p: [3.6, -0.85], node: 'balcony', look: [3.6, -2] },
   grill: { on: 'grill', p: [4.6, -0.95], node: 'balcony', look: [5.2, -0.95] },
   kitchen: { on: 'kitchenTable', p: [6.6, 1.05], node: 'kitchen', look: [6.6, 0.3] },

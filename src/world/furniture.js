@@ -232,14 +232,14 @@ const BUILD = {
     f.box(0.02, U - 0.02, 0, 0.58, 0, D, M.enamel);
     f.box(0.09, U - 0.09, 0.2, 0.585, 0.07, D - 0.07, M.water);
     f.cyl(U - 0.15, 0.03, 0.6, 0.9, 0.015, 0.015, M.metal);
-    f.sph(U - 0.15, 0.03, 1.5, 0.05, M.metal); // shower head
+    f.sph(U - 0.15, 0.03, 1.5, 0.05, M.metal).userData.showerHead = true; // the hand shower: Oleg can take it
   },
   bathSink(f) {
     const { U, D } = f;
     f.cyl(U / 2, 0.2, 0, 0.8, 0.08, 0.06, M.enamel);
     f.box(0.02, U - 0.02, 0.8, 0.9, 0, D - 0.05, M.enamel);
     f.cyl(U / 2, 0.05, 0.9, 1.0, 0.012, 0.012, M.metal);
-    f.box(0.05, U - 0.05, 1.2, 1.75, -0.02, -0.01, mat('#c9dde6', { roughness: 0.05, metalness: 0.6 })); // mirror
+    f.box(0.05, U - 0.05, 1.2, 1.75, -0.02, -0.01, mat('#c9dde6', { roughness: 0.05, metalness: 0.6 })).userData.mirror = true; // replaced by a real mirror (mirror.js)
     f.box(U - 0.02, U + 0.03, 0.55, 0.85, 0.1, 0.35, M.rag); // the rag hangs here
   },
   toilet(f) {

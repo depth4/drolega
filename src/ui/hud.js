@@ -1,6 +1,7 @@
 // DOM HUD: meters, participants, toasts, interaction prompt, hotbar, phone, end screen.
 import { TUNE } from '../config.js';
 import { ITEMS } from '../game/game.js';
+import { iconURL, iconImg } from './icons.js';
 
 const $ = (id) => document.getElementById(id);
 const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
@@ -8,11 +9,12 @@ const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&l
 export function createHUD({ onBuy }) {
   const el = {
     hud: $('hud'), night: $('night'), time: $('time'), room: $('room'),
-    total: $('bar-total'), hut: $('bar-hut'), noise: $('bar-noise'), anger: $('anger'), people: $('people'), toasts: $('toasts'),
+    energy: $('bar-energy'), ofun: $('bar-ofun'), othirst: $('ico-othirst'), total: $('bar-total'), hut: $('bar-hut'), noise: $('bar-noise'), anger: $('anger'), people: $('people'), toasts: $('toasts'),
     prompt: $('prompt'), hotbar: $('hotbar'), doorAlert: $('door-alert'), blackout: $('blackout'),
     phone: $('phone'), phoneTime: $('phone-time'), phoneMoney: $('phone-money'),
     tabCam: $('tab-cam'), tabShop: $('tab-shop'), cam: $('phone-cam'), camView: $('cam-view'), camWho: $('cam-who'),
-    shop: $('phone-shop'), shopList: $('shop-list'), orders: $('orders'),
+    shop: $('phone-shop'), shopCard: $('shop-card'), shopDots: $('shop-dots'), orders: $('orders'),
+    slide: $('slide'), slideKnob: $('slide-knob'), slideFill: $('slide-fill'), slideText: $('slide-text'),
   };
   let cache = {};
   const set = (key, node, html) => {
@@ -21,14 +23,65 @@ export function createHUD({ onBuy }) {
     node.innerHTML = html;
   };
 
-  // shop list (built once)
-  el.shopList.innerHTML = TUNE.shop
-    .map((s) => `<li><b>${esc(s.title)}</b><small>${esc(s.note ?? '')}</small><button type="button" data-buy="${s.id}" ${s.soon ? 'disabled' : ''}>${s.soon ? 'скоро' : `${s.price} ₽`}</button></li>`)
-    .join('');
-  el.shopList.addEventListener('click', (e) => {
-    const id = e.target.closest('[data-buy]')?.dataset.buy;
-    if (id) onBuy(id);
+  // ---- phone: shop carousel with slide-to-buy
+  const items = TUNE.shop.filter((s) => !s.soon);
+  let idx = 0;
+  let money = 0;
+  $('ico-cam').src = iconURL('camera');
+  for (const [id, name] of [['ico-fun', 'fun'], ['ico-hut', 'hut'], ['ico-noise', 'neighbours'], ['ico-energy', 'energy'], ['ico-ofun', 'fun'], ['ico-othirst', 'beer']]) $(id).src = iconURL(name);
+  $('ico-shop').src = iconURL('cart');
+  const renderCard = () => {
+    const it = items[idx];
+    el.shopCard.innerHTML = `<button class="arrow l" type="button" data-step="-1">‹</button>${iconImg(it.icon, '')}<b>${esc(it.title)}</b><small>${esc(it.note ?? '')}</small><div class="price">${it.price} ₽</div><button class="arrow r" type="button" data-step="1">›</button>`;
+    el.shopDots.innerHTML = items.map((_, k) => `<i class="${k === idx ? 'on' : ''}"></i>`).join('');
+    updateSlide();
+  };
+  const step = (d) => {
+    idx = (idx + d + items.length) % items.length;
+    renderCard();
+  };
+  const updateSlide = () => {
+    const poor = money < items[idx].price;
+    el.slide.classList.toggle('no', poor);
+    el.slideText.textContent = poor ? 'Не хватает денег' : `Сдвинь → заказать за ${items[idx].price} ₽`;
+  };
+  el.shopCard.addEventListener('click', (e) => {
+    const d = e.target.closest('[data-step]')?.dataset.step;
+    if (d) step(Number(d));
   });
+  let swipeX = null;
+  el.shopCard.addEventListener('pointerdown', (e) => (swipeX = e.clientX));
+  el.shopCard.addEventListener('pointerup', (e) => {
+    if (swipeX !== null && Math.abs(e.clientX - swipeX) > 40) step(e.clientX < swipeX ? 1 : -1);
+    swipeX = null;
+  });
+  // slide-to-buy: drag the knob to the other end
+  el.slideKnob.style.backgroundImage = `url(${iconURL('cart', { bare: true })})`;
+  let drag = null;
+  const maxX = () => el.slide.clientWidth - el.slideKnob.offsetWidth - 10;
+  const setKnob = (x, anim = false) => {
+    el.slideKnob.style.transition = el.slideFill.style.transition = anim ? 'transform 0.25s, width 0.25s' : 'none';
+    el.slideKnob.style.transform = `translateX(${x}px)`;
+    el.slideFill.style.width = `${x + 30}px`;
+  };
+  el.slideKnob.addEventListener('pointerdown', (e) => {
+    if (money < items[idx].price) return;
+    drag = { x0: e.clientX };
+    el.slideKnob.setPointerCapture(e.pointerId);
+  });
+  el.slideKnob.addEventListener('pointermove', (e) => drag && setKnob(Math.max(0, Math.min(maxX(), e.clientX - drag.x0))));
+  el.slideKnob.addEventListener('pointerup', (e) => {
+    if (!drag) return;
+    const x = e.clientX - drag.x0;
+    drag = null;
+    if (x >= maxX() * 0.9) {
+      onBuy(items[idx].id);
+      el.slide.animate([{ background: 'rgba(127,212,138,0.6)' }, { background: '' }], 500);
+    }
+    setKnob(0, true);
+  });
+  renderCard();
+
   const tab = (which) => {
     el.tabCam.classList.toggle('on', which === 'cam');
     el.tabShop.classList.toggle('on', which === 'shop');
@@ -44,6 +97,17 @@ export function createHUD({ onBuy }) {
     el,
     reset() {
       cache = {};
+    },
+    shopStep: step,
+    // progress of a hands-on action, under the crosshair
+    setUse(h) {
+      const u = $('use');
+      u.hidden = !h;
+      if (!h) return;
+      u.classList.toggle('top', !!h.top); // close-ups: keep the middle of the screen free
+      set('useLabel', $('use-label'), esc(h.label));
+      $('use-bar').parentElement.hidden = h.progress === null;
+      $('use-bar').style.width = `${Math.round((h.progress ?? 0) * 100)}%`;
     },
     // the phone's camera rectangle in canvas pixels (for the scissored render), or null
     camRect() {
@@ -61,23 +125,26 @@ export function createHUD({ onBuy }) {
       el.hut.parentElement.classList.toggle('low', st.hut < 25);
       el.noise.style.width = `${game.noiseLevel * 100}%`;
       el.noise.parentElement.classList.toggle('hot', game.noiseLevel > 0.75);
-      el.anger.textContent = st.anger ? `· злость ${st.anger}${st.policeVisits ? ` · менты ${st.policeVisits}` : ''}` : '';
+      el.anger.textContent = st.anger ? `×${st.anger}` : '';
+      el.energy.style.width = `${game.oleg.energy}%`;
+      el.energy.parentElement.classList.toggle('low', game.oleg.energy < 20);
+      el.ofun.style.width = `${game.oleg.fun}%`;
+      el.ofun.parentElement.classList.toggle('low', game.oleg.fun < 25);
+      el.othirst.hidden = game.oleg.thirst < TUNE.olegThirst.from; // a beer icon: Oleg wants a drink
 
+      // who needs Oleg: name, fun, and a "!" when something is wrong (what exactly — look at him)
+      const alert = iconImg('alert', 'alert');
       const rows = [
-        `<div class="person"><div class="top"><span class="name">Олег (ты)</span><span class="num">пьян ${game.oleg.drunk.toFixed(0)}%</span></div>${bar(game.oleg.fun)}${bar(game.oleg.drunk, 'drunk')}</div>`,
-        ...game.friends.map((f) => {
-          const alarm = f.problem && f.problem.drain > 0;
-          return `<div class="person ${alarm ? 'alarm' : ''}"><div class="top"><span class="name">${esc(f.name)}</span><span class="status">${esc(f.statusText)}</span></div>${bar(f.fun)}</div>`;
-        }),
+        ...game.friends.map((f) => `<div class="person ${f.problem ? 'alarm' : ''}"><span class="name">${esc(f.name)}</span>${f.problem ? alert : '<span></span>'}${bar(f.fun)}</div>`),
         (() => {
           const c = game.cat;
-          const alarm = c.gone || c.problem;
-          return `<div class="person ${alarm ? 'alarm' : ''}"><div class="top"><span class="name">Кот</span><span class="status">${esc(c.statusText)}</span></div>${bar(c.gone ? 0 : c.fun)}</div>`;
+          const bad = c.gone || c.problem;
+          return `<div class="person ${bad ? 'alarm' : ''}"><span class="name">Кот</span>${bad ? alert : '<span></span>'}${bar(c.gone ? 0 : c.fun)}</div>`;
         })(),
       ];
       set('people', el.people, rows.join(''));
 
-      set('toasts', el.toasts, game.toasts.map((t) => `<div class="toast ${t.kind}">${t.room ? `<small>${esc(t.room)}</small>` : ''}${esc(t.text)}</div>`).join(''));
+      set('toasts', el.toasts, game.toasts.slice(-2).map((t) => `<div class="toast ${t.kind}">${t.room ? `<small>${esc(t.room)}</small>` : ''}${esc(t.text)}</div>`).join(''));
 
       if (game.talkLocked) {
         const k = game.talk;
@@ -95,7 +162,7 @@ export function createHUD({ onBuy }) {
       set('prompt', el.prompt, p);
 
       set('hotbar', el.hotbar, game.inv.slots
-        .map((it, i) => `<div class="slot ${i === game.inv.sel ? 'sel' : ''}"><span class="k">${i + 1}</span>${it ? `<span class="ico">${ITEMS[it].icon}</span><span class="lbl">${ITEMS[it].name}</span>` : ''}</div>`)
+        .map((it, i) => `<div class="slot ${i === game.inv.sel ? 'sel' : ''}"><span class="k">${i + 1}</span>${it ? `${iconImg(it, '')}<span class="lbl">${ITEMS[it].name}</span>` : ''}</div>`)
         .join(''));
 
       el.doorAlert.hidden = !game.visitor || !el.phone.hidden;
@@ -103,15 +170,16 @@ export function createHUD({ onBuy }) {
 
       if (!el.phone.hidden) {
         el.phoneTime.textContent = game.clock;
-        el.phoneMoney.textContent = `${st.money} ₽`;
-        el.camWho.textContent = game.visitor ? `У двери: ${game.visitor.name}` : 'Никого';
-        set('orders', el.orders, game.orders.length
-          ? `В пути: ${game.orders.map((o) => `${esc(o.title)} (~${game.gameMinutes(Math.max(0, o.eta))} мин)`).join(', ')}`
-          : 'Заказов нет');
-        for (const b of el.shopList.querySelectorAll('button[data-buy]')) {
-          const s = TUNE.shop.find((x) => x.id === b.dataset.buy);
-          b.disabled = s.soon || st.money < s.price;
+        set('money', el.phoneMoney, `${iconImg('money', '')}${st.money} ₽`);
+        if (money !== st.money) {
+          money = st.money;
+          updateSlide();
         }
+        el.camWho.textContent = game.visitor ? `Стучит: ${game.visitor.name}. Открой дверь в прихожей` : 'У двери никого';
+        el.camWho.classList.toggle('busy', !!game.visitor);
+        set('orders', el.orders, game.orders
+          .map((o) => `<div class="order">${iconImg(o.icon ?? 'cart', '')}<div class="bar"><i style="width:${(100 * (1 - Math.max(0, o.eta) / o.total)).toFixed(0)}%"></i></div><span>~${game.gameMinutes(Math.max(0, o.eta))} мин</span></div>`)
+          .join(''));
       }
     },
   };

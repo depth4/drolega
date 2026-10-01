@@ -6,12 +6,17 @@ import { FURNITURE, TOY_SPOTS, VISITOR_SPOT, CAT_SPOTS, roomAt } from '../world/
 import { makePerson, makePuddle, makeToy, makeBottle, makePlate, makeBrokenMark } from '../world/figures.js';
 import { Friend, Cat, clamp, rand } from './friends.js';
 import { particles } from '../world/particles.js';
+import { icon } from '../ui/icons.js';
+import { Interactions } from './interact.js';
+import { Cooking } from './cooking.js';
 
 export const ITEMS = {
   beer: { name: 'Пиво', icon: '🍺' },
   vodka: { name: 'Водка', icon: '🍾' },
   food: { name: 'Еда', icon: '🍕' },
   mop: { name: 'Тряпка', icon: '🧽' },
+  shower: { name: 'Лейка душа', icon: '🚿' },
+  cat: { name: 'Кот', icon: '🐱' },
   tools: { name: 'Инструменты', icon: '🔧' },
   toy: { name: 'Мышка', icon: '🐭' },
 };
@@ -23,6 +28,7 @@ class Inventory {
   constructor(game) {
     this.game = game;
     this.slots = [null, null, null, null];
+    this.portion = [1, 1, 1, 1]; // food drained badly is only part of a portion
     this.sel = 0;
   }
   selectedItem() {
@@ -31,18 +37,23 @@ class Inventory {
   has(type) {
     return this.slots.includes(type);
   }
-  add(type) {
+  add(type, portion = 1) {
     const i = this.slots.indexOf(null);
     if (i < 0) {
       this.game.toast('Руки заняты — освободи слот (G — выбросить)', 'warn');
       return false;
     }
     this.slots[i] = type;
+    this.portion[i] = portion;
     if (!this.slots[this.sel]) this.sel = i;
     return true;
   }
+  selectedPortion() {
+    return this.portion[this.sel] ?? 1;
+  }
   consume() {
     this.slots[this.sel] = null;
+    this.portion[this.sel] = 1;
   }
   remove(type) {
     const i = this.slots.indexOf(type);
@@ -55,7 +66,9 @@ class Inventory {
     const item = this.slots[this.sel];
     if (!item) return;
     this.slots[this.sel] = null;
+    if (item === 'shower') return this.game.hands.returnShower();
     if (item === 'toy') this.game.respawnToy();
+    else if (item === 'cat') this.game.dropCat();
     else if (['beer', 'vodka', 'food'].includes(item)) this.game.state.fridge[item] += 1; // back to the fridge
   }
 }
@@ -80,6 +93,8 @@ export class Game {
     this.inv = new Inventory(this);
     this.olegPos = [0, 0];
 
+    this.hands = new Interactions(this);
+    this.hands.attachShower(this.furn.items.tub.group);
     this.buildStaticTargets();
     this.buildTableProps();
     this.buildStoveProps();
@@ -118,7 +133,10 @@ export class Game {
   startNight(n) {
     this.night = n;
     this.voices?.stopAll();
+    this.usedClips = new Set();
     this.talk = null;
+    this.leading = null;
+    if (this.hands?.showerHeld()) this.hands.returnShower();
     this.reactCd = 0;
     this.koch = null;
     this.kochT = null;
@@ -136,8 +154,10 @@ export class Game {
       neighborCd: 10,
       policeVisits: 0,
       stats: { helped: 0, bribes: 0, spent: 0 },
+      photos: [],
+      photoCats: new Set(),
     };
-    this.oleg = { fun: 80, drunk: 0, blackout: 0 };
+    this.oleg = { fun: 80, drunk: 0, blackout: 0, energy: TUNE.energy.max, thirst: 20 };
     this.inv = new Inventory(this);
     this.toasts = [];
     this.toastKeys = {};
@@ -158,11 +178,11 @@ export class Game {
     this.friends = FRIEND_IDS.map((id) => new Friend(this, id));
     for (const f of this.friends) {
       this.dynamic.add(f.figure.root);
-      f.figure.root.userData.target = { name: f.name, friend: f, actions: () => f.actions(this) };
+      f.figure.root.userData.target = { name: f.name, friend: f, info: () => (f.problem ? f.problem.text : f.statusText), actions: () => f.actions(this) };
     }
     if (this.cat) this.dynamic.remove(this.cat.figure.root);
     this.cat = new Cat(this);
-    this.cat.figure.root.userData.target = { name: 'Кот', cat: this.cat, actions: () => this.cat.actions(this) };
+    this.cat.figure.root.userData.target = { name: 'Кот', cat: this.cat, info: () => this.cat.statusText, actions: () => this.cat.actions(this) };
     this.dynamic.add(this.cat.figure.root);
 
     this.doors.balcony.setOpen(true);
@@ -231,24 +251,24 @@ export class Game {
     const room = roomAt(x, z);
     if (!room || room.id === 'landing') return;
     const p = makePuddle(x, z);
+    const puddle = { mesh: p, dirt: 1, sx: p.scale.x, sz: p.scale.z };
     p.userData.target = {
       name: 'Блевота',
-      info: () => (this.inv.has('mop') ? '' : 'Нужна тряпка — висит у раковины в санузле'),
-      actions: () =>
-        this.inv.selectedItem() === 'mop' || this.inv.has('mop')
-          ? [{
-              key: 'E', text: 'Убрать тряпкой',
-              run: () => {
-                this.dynamic.remove(p);
-                this.puddles = this.puddles.filter((q) => q !== p);
-                this.state.hut += TUNE.hut.clean;
-              },
-            }]
-          : [],
+      puddle,
+      info: () => (this.inv.selectedItem() === 'mop' ? '' : this.inv.has('mop') ? 'Возьми тряпку в руку (1–4)' : 'Нужна тряпка — висит у раковины в санузле'),
+      actions: () => [],
     };
     this.dynamic.add(p);
     this.puddles.push(p);
     this.toast(`Блевота: ${room.name}`, 'bad', room.name);
+  }
+
+  removePuddle(p) {
+    if (!this.puddles.includes(p)) return;
+    this.dynamic.remove(p);
+    this.puddles = this.puddles.filter((q) => q !== p);
+    this.state.hut += TUNE.hut.clean;
+    this.olegHelped();
   }
 
   setBroken(item, v) {
@@ -288,6 +308,13 @@ export class Game {
     this.toy.visible = true;
   }
 
+  // put the cat down in front of Oleg (G, or Q while holding him = pet instead)
+  dropCat() {
+    const [x, z] = this.olegPos;
+    const yaw = this.olegYaw ?? 0;
+    this.cat.putDown(x - Math.sin(yaw) * 0.6, z - Math.cos(yaw) * 0.6);
+  }
+
   fanGrill() {
     this.grill.heat = 100;
     this.sfx.whoosh();
@@ -323,12 +350,37 @@ export class Game {
 
   // ---------- Oleg ----------
 
+  // pay for an action with Oleg's strength; false (and a hint) if he has none left
+  spend(cost) {
+    if (!cost) return true;
+    if (this.oleg.energy < cost) {
+      this.toastOnce('tired', 'Нет сил. Подожди пару секунд или поешь', 'warn', 3);
+      this.sfx.click();
+      return false;
+    }
+    this.oleg.energy -= cost;
+    return true;
+  }
+
+
   useSelf() {
     const item = this.inv.selectedItem();
+    if (item === 'cat') {
+      // stroke the cat in your arms
+      if (!this.spend(TUNE.cost.petCat)) return;
+      this.cat.fun = clamp(this.cat.fun + TUNE.cat.pet);
+      this.oleg.fun += 2;
+      this.sfx.purr();
+      return;
+    }
     const d = TUNE.give[item];
     if (!d) return;
+    const part = this.inv.selectedPortion();
     this.inv.consume();
-    this.oleg.fun += d.fun;
+    const E = TUNE.energy;
+    this.oleg.energy = Math.min(E.max, this.oleg.energy + ({ food: E.fromFood, beer: E.fromBeer, vodka: E.fromVodka }[item] ?? 0) * part);
+    this.oleg.fun += d.fun * part;
+    if (item === 'beer' || item === 'vodka') this.oleg.thirst = Math.max(0, this.oleg.thirst - TUNE.olegThirst[item]);
     this.oleg.drunk = clamp(this.oleg.drunk + d.drunk);
     this.sfx.gulp();
     if (this.oleg.drunk >= TUNE.oleg.blackoutAt) {
@@ -434,11 +486,35 @@ export class Game {
     return !!this.visitor;
   }
 
+  // ---------- photos ----------
+  // subjects: [{ f (friend or cat), moment: { cat, caption } }] already filtered to what's in frame
+  takePhoto(subjects, img) {
+    const P = TUNE.photo, st = this.state;
+    if (st.photos.length >= P.perNight) {
+      this.voices?.play('event_memfull');
+      this.toastOnce('memfull', 'Память заполнена', 'warn', 2);
+      return;
+    }
+    this.sfx.shutter();
+    const fresh = subjects.find((s) => !st.photoCats.has(s.moment.cat));
+    if (!fresh) {
+      this.toast(subjects.length ? 'Такое уже снимал сегодня' : 'Ничего интересного в кадре', 'info');
+      return;
+    }
+    st.photoCats.add(fresh.moment.cat);
+    st.photos.push({ caption: fresh.moment.caption, img });
+    st.totalFun = clamp(st.totalFun + P.fun);
+    if (fresh.f.fun !== undefined) fresh.f.fun = clamp(fresh.f.fun + P.friendFun);
+    this.oleg.fun += 4;
+    this.toast(`Снято: ${fresh.moment.caption} (${st.photos.length}/${P.perNight})`, 'good');
+    return st.photos.at(-1);
+  }
+
   // somebody near Lyokha reacts to the vomit (not every time)
   reactToPuke(f) {
     if (this.state.t < this.reactCd || Math.random() > 0.6) return;
     this.reactCd = this.state.t + 25;
-    setTimeout(() => this.voices?.play('event_puke', { pos: [...f.pos] }), 700);
+    setTimeout(() => this.voices?.play('event_puke', { pos: [...f.pos] }), 1200); // after the splash, not before
   }
 
   dismissVisitor() {
@@ -517,7 +593,7 @@ export class Game {
     st.money -= item.price;
     st.stats.spent += item.price;
     const eta = rand(TUNE.delivery.min, TUNE.delivery.max);
-    this.orders.push({ title: item.title, gives: item.gives, eta });
+    this.orders.push({ title: item.title, icon: item.icon, gives: item.gives, eta, total: eta });
     this.sfx.ding();
     this.toast(`Заказ: ${item.title}. Курьер будет через ~${this.gameMinutes(eta)} мин`, 'info');
   }
@@ -547,7 +623,10 @@ export class Game {
         const D = TUNE.drink;
         if (item === 'beer') return [{ key: 'E', text: `Поставить пиво (+${D.beer.servings})`, run: () => (this.inv.consume(), (this.state.table.beer += D.beer.servings)) }];
         if (item === 'vodka') return [{ key: 'E', text: `Поставить водку (+${D.vodka.servings})`, run: () => (this.inv.consume(), (this.state.table.vodka += D.vodka.servings)) }];
-        if (item === 'food') return [{ key: 'E', text: `Выложить еду (+${D.plates})`, run: () => (this.inv.consume(), (this.state.table.food += D.plates)) }];
+        if (item === 'food') {
+          const plates = Math.max(1, Math.round(D.plates * this.inv.selectedPortion()));
+          return [{ key: 'E', text: `Выложить еду (+${plates})`, run: () => (this.inv.consume(), (this.state.table.food += plates)) }];
+        }
         return [];
       },
     });
@@ -560,11 +639,18 @@ export class Game {
         },
       }],
     });
+    T('tub', {
+      info: () => (this.hands.showerHeld() ? 'Лейка у тебя: зажми ЛКМ и поливай' : ''),
+      actions: () =>
+        this.hands.showerHeld()
+          ? [{ key: 'E', text: 'Повесить лейку обратно', run: () => this.hands.returnShower() }]
+          : [{ key: 'E', text: 'Взять лейку душа', run: () => this.hands.takeShower() }],
+    });
     T('bathSink', { actions: () => (this.inv.has('mop') ? [] : [{ key: 'E', text: 'Взять тряпку', run: () => this.inv.add('mop') }]) });
     T('wardrobe', { actions: () => (this.inv.has('tools') ? [] : [{ key: 'E', text: 'Взять инструменты', run: () => this.inv.add('tools') }]) });
     T('grill', {
       info: () => (this.grill.lit ? `Жар: ${Math.round(this.grill.heat)}%` : 'Не горит'),
-      actions: () => (this.grill.lit ? [{ key: 'E', text: 'Раздуть мангал', run: () => this.fanGrill() }] : []),
+      actions: () => (this.grill.lit ? [{ key: 'E', text: 'Раздуть мангал', cost: TUNE.cost.fan, run: () => this.fanGrill() }] : []),
     });
     T('stove', {
       info: () =>
@@ -575,9 +661,25 @@ export class Game {
         })[this.stove.phase],
       actions: () => {
         if (this.stove.phase === 'idle' && this.state.fridge.pelmeni > 0)
-          return [{ key: 'E', text: 'Сварить пельмени', run: () => (this.state.fridge.pelmeni--, (this.stove = { phase: 'cooking', t: 0 })) }];
+          return [{
+            key: 'E', text: 'Сварить пельмени', cost: TUNE.cost.cook, mini: true,
+            run: () =>
+              this.startFocus('cook', TUNE.cost.cook, () => {
+                this.state.fridge.pelmeni--;
+                this.stove = { phase: 'cooking', t: 0 };
+                this.cooking.potOnStove();
+              }),
+          }];
         if (this.stove.phase === 'ready')
-          return [{ key: 'E', text: 'Снять пельмени', run: () => this.inv.add('food') && (this.stove = { phase: 'idle', t: 0 }) }];
+          return [{
+            key: 'E', text: 'Слить воду и снять', cost: TUNE.cost.drain, mini: true,
+            run: () =>
+              this.startFocus('drain', TUNE.cost.drain, (score) => {
+                this.stove = { phase: 'idle', t: 0 };
+                if (score <= 0) return this.toast('Все пельмени уплыли в раковину', 'bad');
+                if (this.inv.add('food', score) && score < 0.9) this.toast(`Спас ${Math.round(score * 100)}% пельменей`, 'warn');
+              }),
+          }];
         return [];
       },
     });
@@ -591,7 +693,7 @@ export class Game {
         if (!item.broken) return base();
         if (!this.inv.has('tools')) return [];
         return [{
-          key: 'R', text: 'Починить',
+          key: 'R', text: 'Починить', cost: TUNE.cost.repair,
           run: () => {
             this.setBroken(item, false);
             this.state.hut += TUNE.hut.repair;
@@ -630,14 +732,53 @@ export class Game {
       vodka: [[-0.35, 0.22], [0.3, -0.22]].map(([a, b]) => place(makeBottle('vodka'), a, b)),
       food: [[-0.25, 0.05], [0.25, -0.02], [0, 0.28], [0, -0.28]].map(([a, b]) => place(makePlate(), a, b)),
     };
+    // a sign over the table: booze and food left, red when it ran out
+    const c = document.createElement('canvas');
+    c.width = 320;
+    c.height = 140;
+    const tex = new THREE.CanvasTexture(c);
+    tex.colorSpace = THREE.SRGBColorSpace;
+    const sign = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, transparent: true, depthTest: false, sizeAttenuation: false }));
+    sign.scale.set(0.16, 0.07, 1);
+    sign.renderOrder = 9;
+    sign.position.set(cx, 1.55, cz);
+    this.dynamic.add(sign);
+    this.tableSign = { c, tex, sign, key: '' };
+  }
+
+  drawTableSign() {
+    const s = this.tableSign, t = this.state.table;
+    const booze = t.beer + t.vodka, food = t.food;
+    const key = `${booze}|${food}`;
+    if (key === s.key) return;
+    s.key = key;
+    const g = s.c.getContext('2d');
+    g.clearRect(0, 0, 320, 140);
+    const cell = (x, name, n) => {
+      g.fillStyle = n > 0 ? 'rgba(20,18,24,0.82)' : 'rgba(170,30,25,0.92)';
+      g.beginPath();
+      g.roundRect(x, 10, 150, 120, 26);
+      g.fill();
+      g.drawImage(icon(name, 96), x + 6, 22, 96, 96);
+      g.fillStyle = '#fff';
+      g.font = 'bold 64px "Russo One", Arial, sans-serif';
+      g.textAlign = 'center';
+      g.textBaseline = 'middle';
+      g.fillText(n > 0 ? String(n) : '!', x + 124, 72);
+    };
+    cell(4, 'booze', booze);
+    cell(166, 'food', food);
+    s.tex.needsUpdate = true;
   }
 
   buildStoveProps() {
-    const s = this.furn.items.stove;
-    const pot = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.11, 0.16, 16), new THREE.MeshStandardMaterial({ color: '#b8b8b8', metalness: 0.7, roughness: 0.3 }));
-    pot.position.set((s.x0 + s.x1) / 2, 0.95, (s.z0 + s.z1) / 2 + 0.12);
-    this.dynamic.add(pot);
-    this.stoveProps = { pot };
+    this.cooking = new Cooking(this);
+  }
+
+  // close-up hands-on scene (pelmeni): the camera flies in, the mouse moves real objects
+  startFocus(kind, cost, done) {
+    if (this.cooking.focus || this.over || !this.spend(cost)) return;
+    this.cooking.start(kind, done);
   }
 
   buildGrillProps() {
@@ -678,6 +819,13 @@ export class Game {
     const o = this.oleg;
     o.fun = clamp(o.fun - TUNE.fun.olegBoredom * dt + (st.music ? 0.2 * dt : 0));
     o.drunk = clamp(o.drunk - TUNE.oleg.drunkDecay * dt);
+    o.energy = Math.min(TUNE.energy.max, o.energy + TUNE.energy.regen * dt);
+    const OT = TUNE.olegThirst;
+    o.thirst = Math.min(100, o.thirst + OT.rate * dt);
+    if (o.thirst > OT.from) {
+      o.fun -= OT.drain * dt * ((o.thirst - OT.from) / (100 - OT.from));
+      this.toastOnce('olegThirst', 'Олегу надо выпить: возьми бутылку и нажми Q', 'warn', 25);
+    }
     if (o.blackout > 0) {
       o.blackout -= dt;
       if (o.blackout <= 0) o.drunk = 60;
@@ -710,7 +858,7 @@ export class Game {
         this.alert('Пельмени сгорели! Вонь на всю хату', 'Кухня');
       }
     }
-    this.stoveProps.pot.visible = this.stove.phase !== 'idle';
+    if (!this.cooking.focus && this.stove.phase === 'idle' && this.cooking.pot.visible) this.cooking.pot.visible = false;
 
     // grill glow
     const glow = this.grill.lit ? 0.3 + (this.grill.heat / 100) * 1.8 : 0;
@@ -797,6 +945,7 @@ export class Game {
     this.tableProps.beer.forEach((b, i) => (b.visible = i < Math.ceil(t.beer / TUNE.drink.beer.servings)));
     this.tableProps.vodka.forEach((b, i) => (b.visible = i < Math.ceil(t.vodka / TUNE.drink.vodka.servings)));
     this.tableProps.food.forEach((p, i) => (p.visible = i < t.food));
+    this.drawTableSign();
 
     // toasts
     for (const x of this.toasts) x.life -= dt;

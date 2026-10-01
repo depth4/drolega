@@ -19,11 +19,12 @@ const falloff = (pos) => {
 
 export const voices = {
   has: (key) => !!CLIPS[key]?.length,
-  // play a random clip of `key` ('lyokha_booze'); pos = [x, z] or () => [x, z] for distance volume
-  play(key, { pos = null, gain = 1, loop = false } = {}) {
+  list: (key) => CLIPS[key] ?? [],
+  // play a random clip of `key` ('lyokha_booze'), or a given `src`; pos = [x, z] or () => [x, z] for distance volume
+  play(key, { pos = null, gain = 1, loop = false, src = null } = {}) {
     const list = CLIPS[key];
     if (!ctx || !list?.length) return null;
-    const a = new Audio(list[Math.floor(Math.random() * list.length)]);
+    const a = new Audio(src ?? list[Math.floor(Math.random() * list.length)]);
     const h = {
       key, audio: a, pos, gain,
       get playing() {
@@ -116,6 +117,8 @@ export const sfx = {
   whoosh: () => noise(0.4, { vol: 0.4, freq: 900, q: 0.4 }),
   fix: () => [0, 0.15, 0.3].forEach((w) => tone(1200, 0.05, { vol: 0.08, when: w })),
   click: () => tone(1500, 0.03, { vol: 0.05 }),
+  pat: () => noise(0.07, { vol: 0.7, freq: 350, q: 1.5 }),
+  shutter: () => (noise(0.04, { vol: 0.8, freq: 5000, q: 0.7 }), noise(0.06, { vol: 0.6, freq: 2500, q: 0.7, when: 0.08 })),
 };
 
 // Party music: a dumb 4-chord loop with a kick. Plays while the stereo is on.

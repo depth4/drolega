@@ -102,6 +102,8 @@ const PROPS = {
   },
 };
 
+export const makeProp = (name) => PROPS[name]?.() ?? null;
+
 // ---------- clips ----------
 // A clip writes into the target pose `p`. `c` = context: T (time), dt, drunk, beat, side helpers, emit().
 
@@ -273,6 +275,15 @@ const LOOPS = {
     p.legs[1].z = 0.12;
     if (c.every(1.4)) c.emit('zzz');
   },
+  // soaked with cold water: arms wrapped around himself, shaking
+  shiver(p, c) {
+    for (const [i, s] of SIDES.entries()) Object.assign(p.arms[i], { ik: { at: 'chest', off: [-s * 0.14, -0.04, 0.05] }, ikW: 1 });
+    p.spine.x = 0.25;
+    p.neck.x = 0.25;
+    p.spine.z = 0.04 * Math.sin(c.T * 60);
+    p.body.x += 0.01 * Math.sin(c.T * 55);
+    for (const l of p.legs) l.knee = 0.2;
+  },
   needToilet(p, c) {
     const j = Math.abs(Math.sin(c.T * 9));
     p.legs[0].z = 0.13;
@@ -360,6 +371,15 @@ const SHOTS = {
       mix(p.neck, 'x', -0.7, w);
       mix(p.spine, 'x', -0.2, w);
       p.spine.z += 0.05 * Math.sin(c.T * 30) * w;
+    },
+  },
+  // a pat on the back jolts him forward
+  jolt: {
+    dur: 0.35,
+    run(p, c, w, u) {
+      const k = Math.sin((Math.PI * u) / 0.35);
+      p.spine.x += 0.35 * k * w;
+      p.neck.x += 0.2 * k * w;
     },
   },
   stumble: {

@@ -3,6 +3,9 @@ import { TUNE } from '../config.js';
 import { SPOTS, CAT_SPOTS, roomAt } from '../world/layout.js';
 import { makePerson, makeCat } from '../world/figures.js';
 import { route } from './nav.js';
+import { NAV } from '../world/layout.js';
+
+const nearestNode = (x, z) => Object.entries(NAV).reduce((b, [k, [nx, nz]]) => (Math.hypot(nx - x, nz - z) < b.d ? { k, d: Math.hypot(nx - x, nz - z) } : b), { k: 'living', d: 1e9 }).k;
 
 export const rand = (a, b) => a + Math.random() * (b - a);
 export const chance = (perSec, dt) => Math.random() < perSec * dt;
@@ -104,7 +107,7 @@ class Walker {
 // ---------- activities ----------
 
 const ACTIVITIES = {
-  table: { spots: ['table1', 'table2'], dur: [12, 20], label: 'бухает за столом' },
+  table: { spots: ['table1', 'table2', 'table3'], dur: [12, 20], label: 'бухает за столом' },
   sofa: { spots: ['sofaA', 'sofaB'], dur: [8, 14], label: 'на диване', fun: 0.5 },
   kitchen: { spots: ['kitchen'], dur: [6, 10], label: 'трётся на кухне', fun: 0.4 },
   balcony: { spots: ['balcony'], dur: [6, 10], label: 'дышит на балконе', fun: 0.4 },
@@ -151,6 +154,22 @@ export const CHARS = {
 // A problem: { id, text (log), short (bubble), drain, actions(g) -> [{key, text, run}], tick(dt) }
 
 const PROBLEMS = {
+  // wants a drink / food but the table is empty; solved by restocking the table or handing it over
+  want(f, g, what) {
+    const booze = what === 'booze';
+    return {
+      id: booze ? 'wantBooze' : 'wantFood',
+      text: booze ? 'хочет бухнуть, а на столе пусто' : 'голодный, а на столе пусто',
+      short: booze ? 'ХОЧЕТ БУХАТЬ' : 'ГОЛОДНЫЙ',
+      drain: 1.2,
+      tick() {
+        const has = booze ? g.tableBooze() > 0 : g.state.table.food > 0;
+        const fine = booze ? f.thirst < 50 : f.hunger < 50;
+        if (has || fine) f.clearProblem(false);
+      },
+      actions: () => [],
+    };
+  },
   hog(f, g) {
     let t = 0;
     return {
@@ -169,7 +188,7 @@ const PROBLEMS = {
         }
       },
       actions: () => [{
-        key: 'E', text: 'Отобрать бутылку',
+        key: 'E', text: 'Отобрать бутылку', cost: TUNE.cost.takeBottle,
         run() {
           f.fun -= 5;
           f.clearProblem(true);
@@ -199,15 +218,15 @@ const PROBLEMS = {
         for (const o of g.friends) if (o !== f && o.room === f.room) o.fun -= 0.3 * dt;
       },
       actions: () => [
-        !tried.has('pat') && { key: 'E', text: 'Погладить по головке', run: attempt('pat') },
-        !tried.has('hug') && { key: 'R', text: 'Обнять', run: attempt('hug') },
+        !tried.has('pat') && { key: 'E', text: 'Погладить по головке', cost: TUNE.cost.comfort, run: attempt('pat') },
+        !tried.has('hug') && { key: 'R', text: 'Обнять', cost: TUNE.cost.comfort, run: attempt('hug') },
       ].filter(Boolean),
     };
   },
   puke(f, g) {
-    let t = 0;
+    let t = TUNE.lyokha.pukeEvery - 1.6; // the first puddle comes right after the first visible heave
     return {
-      id: 'puke', text: 'блюёт', short: 'БЛЮЁТ', drain: 1.5,
+      id: 'puke', text: 'блюёт — возьми лейку у ванны и полей его', short: 'БЛЮЁТ', drain: 1.5,
       tick(dt) {
         t += dt;
         if (t >= TUNE.lyokha.pukeEvery && f.mode !== 'walk') {
@@ -221,7 +240,7 @@ const PROBLEMS = {
     };
   },
   sleepTub(f, g) {
-    return { id: 'sleepTub', text: 'вырубился в ванной', short: 'СПИТ В ВАННОЙ', drain: 1.5, actions: () => showerActions(f, g) };
+    return { id: 'sleepTub', text: 'вырубился в ванной — полей его из лейки', short: 'СПИТ В ВАННОЙ', drain: 1.5, actions: () => showerActions(f, g) };
   },
   smash(f, g) {
     let t = 0;
@@ -237,14 +256,16 @@ const PROBLEMS = {
         }
       },
       actions: () => [{
-        key: 'E', text: 'Отвести в ванную',
+        key: 'E', text: 'Взять за плечо и вести в ванную', cost: TUNE.cost.lead,
         run() {
-          f.walkTo(SPOTS.tub, () => f.setProblem(PROBLEMS.sleepTub(f, g), true));
-          f.problem.short = 'ИДЁТ В ВАННУЮ';
-          f.problem.drain = 0;
-          f.problem.tick = null;
-          f.problem.actions = () => [];
-          f.figure.setStatus('ИДЁТ В ВАННУЮ', '#8a6d1a');
+          // he follows Oleg along his footsteps; Oleg has to walk him into the bathroom himself
+          f.path = null;
+          f.mode = 'idle';
+          f.follow = { trail: [[...f.pos]], idx: 0 };
+          g.leading = f;
+          f.problem = { id: 'led', text: 'идёт за тобой, веди в санузел', short: 'ИДЁТ ЗА ТОБОЙ', drain: 0, since: 0, actions: () => [] };
+          f.figure.setStatus(null); // being handled: no "!"
+          g.toast('Лёха идёт за тобой. Заведи его в санузел', 'info');
         },
       }],
     };
@@ -252,7 +273,7 @@ const PROBLEMS = {
   grillOut(f, g) {
     return {
       id: 'grillOut', text: 'мангал тухнет', short: 'МАНГАЛ ТУХНЕТ', drain: 1,
-      actions: () => [{ key: 'E', text: 'Раздуть мангал', run: () => g.fanGrill() }],
+      actions: () => [{ key: 'E', text: 'Раздуть мангал', cost: TUNE.cost.fan, run: () => g.fanGrill() }],
     };
   },
   smoke(f, g) {
@@ -269,29 +290,14 @@ const PROBLEMS = {
   },
   sleep(f, g, text = 'уснул под аниме') {
     return {
-      id: 'sleep', text, short: 'СПИТ', drain: 1.2,
-      actions: () => [{
-        key: 'E', text: 'Разбудить',
-        run() {
-          f.fun += 5;
-          f.clearProblem(true);
-          f.endActivity();
-        },
-      }],
+      id: 'sleep', text: `${text} — зажми ЛКМ и потряси его`, short: 'СПИТ', drain: 1.2,
+      actions: () => [],
     };
   },
   cough(f, g) {
     return {
-      id: 'cough', text: 'закашлялся в дыму от вейпа', short: 'КАШЛЯЕТ', drain: 2,
-      actions: () => [{
-        key: 'E', text: 'Похлопать по спине',
-        run() {
-          g.voices?.play('event_pat', { pos: f.pos });
-          f.fun += 10;
-          f.clearProblem(true);
-          f.endActivity();
-        },
-      }],
+      id: 'cough', text: 'закашлялся от вейпа — похлопай по спине (ЛКМ)', short: 'КАШЛЯЕТ', drain: 2,
+      actions: () => [],
     };
   },
   waitToilet(f, g) {
@@ -315,20 +321,9 @@ const PROBLEMS = {
   },
 };
 
-function showerActions(f, g) {
-  if (f.room?.id !== 'bath') return [];
-  return [{
-    key: 'E', text: 'Облить ледяным душем',
-    run() {
-      f.drunk = TUNE.lyokha.sober;
-      f.wasted = false;
-      f.fun += 10;
-      f.clearProblem(true);
-      g.toast('Лёха ожил после ледяного душа', 'good');
-      g.sfx.splash();
-      f.endActivity();
-    },
-  }];
+// Lyokha wasted in the bathroom: no button — take the hand shower from the tub and soak him (see interact.js)
+function showerActions() {
+  return [];
 }
 
 function startWasted(f, g) {
@@ -336,9 +331,7 @@ function startWasted(f, g) {
   f.endActivity(true);
   const kind = pickWeighted([['puke', 0.45], ['sleepTub', 0.25], ['smash', 0.3]]);
   if (kind === 'puke') {
-    const [x, z] = f.front(0.5);
-    g.addPuddle(x, z);
-    g.reactToPuke(f);
+    // holds his mouth on the way; the puddle and the reaction come when he actually throws up
     f.setProblem(PROBLEMS.puke(f, g));
     f.walkTo(SPOTS.bathStand);
   } else if (kind === 'sleepTub') {
@@ -360,6 +353,8 @@ export class Friend extends Walker {
     this.fun = TUNE.start.friendFun;
     this.drunk = 0;
     this.bladder = rand(0, 40);
+    this.thirst = rand(10, 40);
+    this.hunger = rand(0, 30);
     this.activity = null;
     this.problem = null;
     this.wasted = false;
@@ -376,6 +371,10 @@ export class Friend extends Walker {
   voice(kind, opts = {}) {
     if (this.game.hushed) return null; // someone is at the door: everybody keeps quiet
     return this.game.voices?.play(`${this.id}_${kind}`, { pos: () => this.pos, ...opts });
+  }
+
+  unusedMonolog() {
+    return this.game.voices?.list(`${this.id}_monolog`).find((src) => !this.game.usedClips.has(src)) ?? null;
   }
 
   // a line out loud: the recording + a speech bubble + a gesture
@@ -414,6 +413,30 @@ export class Friend extends Walker {
     if (this.boozeIn > 0 && (this.boozeIn -= dt) <= 0) this.voice('booze');
   }
 
+  // a reaction to food, now and then (Temych has one recorded)
+  ate() {
+    this.figure.play('eat');
+    this.foodCd = (this.foodCd ?? 0);
+    if (this.foodCd <= this.game.state.t && Math.random() < 0.6 && this.game.voices?.has(`${this.id}_food`)) {
+      this.foodCd = this.game.state.t + rand(20, 35);
+      setTimeout(() => this.voice('food'), 1800);
+    }
+  }
+
+  // what a photo of him right now would show (null = nothing worth a shot)
+  photoMoment() {
+    const loop = this.animLoop();
+    const n = this.name;
+    const byLoop = {
+      puke: `${n} блюёт`, holdMouth: `${n} сейчас блеванёт`, dance: `${n} танцует`, seatDance: `${n} танцует на диване`,
+      cough: `${n} кашляет`, choke: `${n} задыхается в дыму`, sleep: `${n} спит`, cry: `${n} рыдает`, smash: `${n} громит хату`,
+      smashWalk: `${n} громит хату`, chug: `${n} пьёт из горла`, vape: `${n} парит`, grill: `${n} жарит шашлык`,
+      shiver: `${n} мокрый и дрожит`, phone: `${n} смотрит аниме`, needToilet: `${n} хочет в туалет`,
+    };
+    const cat = { puke: 'puke', holdMouth: 'puke', dance: 'dance', seatDance: 'dance', cough: 'cough', choke: 'cough', sleep: 'sleep', cry: 'cry', smash: 'smash', smashWalk: 'smash', chug: 'chug', vape: 'vape', grill: 'grill', shiver: 'wet', phone: 'anime', needToilet: 'toilet' }[loop];
+    return cat ? { cat, caption: byLoop[loop] } : null;
+  }
+
   drink(d, buzzTime = 0, kind = 'beer') {
     this.figure.sip(2.4, kind);
     // reaction to the drink right after the sip (not every time, or it turns into noise)
@@ -429,8 +452,9 @@ export class Friend extends Walker {
   // what the body is doing right now (clip names from world/anim.js)
   animLoop() {
     if (this.debugLoop !== undefined) return this.debugLoop; // console testing: f.debugLoop = 'puke'
+    if (this.wetT > 0 && this.figure.pose !== 'lie') return 'shiver';
     const pid = this.problem?.id;
-    if (this.mode === 'walk') return pid === 'smash' ? 'smashWalk' : pid === 'puke' ? 'holdMouth' : null;
+    if (this.mode === 'walk' || this.follow) return pid === 'smash' ? 'smashWalk' : pid === 'puke' || pid === 'led' ? 'holdMouth' : null;
     const byProblem = { hog: 'chug', cry: 'cry', puke: 'puke', sleepTub: 'sleep', sleep: 'sleep', smash: 'smash', grillOut: 'wave', smoke: 'choke', cough: 'cough', waitToilet: 'needToilet' };
     if (byProblem[pid]) return byProblem[pid];
     const act = this.activity?.id;
@@ -452,6 +476,8 @@ export class Friend extends Walker {
 
   animate(dt) {
     const d = this.drunk / 100;
+    const [ox, oz] = this.game.olegPos;
+    this.figure.showName?.(Math.hypot(ox - this.pos[0], oz - this.pos[1]) < 4.5); // names only up close
     const loop = this.animLoop();
     this.figure.setLoop(loop);
     this.figure.setFace?.(this.faceState());
@@ -466,11 +492,16 @@ export class Friend extends Walker {
       }
     }
     // drunk walking: weaving from side to side, the body turning with it
-    const walk = this.mode === 'walk';
+    this.wetT = Math.max(0, (this.wetT ?? 0) - dt);
+    this.wet = Math.max(0, (this.wet ?? 0) - dt * 0.03);
+    this.shake = Math.max(0, (this.shake ?? 0) - dt * 2.5);
+    const walk = (this.mode === 'walk' && this.game.talk?.friend !== this) || (this.follow && this.walkingNow);
     const n = Math.sin(this.t * 1.3 + this.seed) * 0.6 + Math.sin(this.t * 2.9 + this.seed * 2) * 0.4;
     const lat = walk ? 0.17 * d * n : 0;
-    this.applyTransform(Math.cos(this.heading) * lat, -Math.sin(this.heading) * lat, walk ? 0.35 * d * Math.sin(this.t * 2.1 + this.seed) : 0);
-    this.figure.update(dt, { walking: walk && !(this.lurch > 0), speed: this.speed, drunk: d, music: this.game.state.music });
+    const jig = this.shake * Math.sin(this.t * 45) * 0.06; // being shaken awake
+    this.applyTransform(Math.cos(this.heading) * (lat + jig), -Math.sin(this.heading) * (lat + jig), walk ? 0.35 * d * Math.sin(this.t * 2.1 + this.seed) : 0);
+    const talking = this.game.talk?.friend === this; // stands still while telling his story
+    this.figure.update(dt, { walking: walk && !(this.lurch > 0) && !talking, speed: this.speed, drunk: d, music: this.game.state.music });
   }
 
   get statusText() {
@@ -538,9 +569,95 @@ export class Friend extends Walker {
       } else this.startActivity('toilet');
       return;
     }
+    const N = TUNE.needs;
+    if ((this.thirst > N.goAt || this.hunger > N.goAt) && (this.startActivity('table') || this.startActivity('sofa'))) return;
     const options = Object.entries(this.def.prefs).filter(([id]) => ACTIVITIES[id].spots.some((s) => this.spotFree(s)));
     if (!options.length) return;
     this.startActivity(pickWeighted(options));
+  }
+
+  // hit by the shower: gets wet and shivers; a wasted Lyokha comes round, anyone else just gets annoyed
+  soak(dt) {
+    const H = TUNE.hands;
+    this.wet = Math.min(1, (this.wet ?? 0) + H.soak * dt);
+    this.wetT = 0.4;
+    const pid = this.problem?.id;
+    if (pid === 'puke' || pid === 'sleepTub') {
+      if (this.wet >= 1) {
+        this.drunk = TUNE.lyokha.sober;
+        this.wasted = false;
+        this.fun += 10;
+        this.wet = 0;
+        this.clearProblem(true);
+        this.game.toast(`${this.name} ожил после ледяного душа`, 'good');
+        this.game.sfx.splash();
+        this.endActivity();
+        this.figure.say('Бррр! Всё, всё, я живой!', 2.5);
+      } else if (Math.random() < dt * 0.8) this.figure.say(Math.random() < 0.5 ? 'Бррр!' : 'А-а-а, холодно!', 1.2);
+    } else {
+      this.fun -= 4 * dt;
+      if (Math.random() < dt * 0.8) this.figure.say('Эй, ты чё творишь?!', 1.4);
+    }
+  }
+
+  // being led by Oleg: walk along his trail, keep a step behind; the bathroom ends it
+  stepFollow(dt) {
+    const g = this.game, fo = this.follow;
+    const [ox, oz] = g.olegPos;
+    const last = fo.trail[fo.trail.length - 1];
+    if (Math.hypot(ox - last[0], oz - last[1]) > 0.25) fo.trail.push([ox, oz]);
+    const dOleg = Math.hypot(ox - this.pos[0], oz - this.pos[1]);
+    if (dOleg > 7) {
+      // Oleg ran off: he goes back to smashing
+      this.follow = null;
+      g.leading = null;
+      this.problem = null;
+      this.setProblem(PROBLEMS.smash(this, g));
+      g.toast('Лёха отстал и опять громит хату', 'bad');
+      return;
+    }
+    if (this.room?.id === 'bath') {
+      this.follow = null;
+      g.leading = null;
+      this.problem = null;
+      this.node = 'bath';
+      this.walkTo(SPOTS.tub, () => this.setProblem(PROBLEMS.sleepTub(this, g)));
+      g.olegHelped();
+      return;
+    }
+    this.walkingNow = false;
+    if (dOleg < 1.0) return; // close enough, wait
+    let step = this.speed * 1.1 * dt;
+    while (step > 0 && fo.idx < fo.trail.length) {
+      const [tx, tz] = fo.trail[fo.idx];
+      const dx = tx - this.pos[0], dz = tz - this.pos[1], d = Math.hypot(dx, dz);
+      if (d <= step) {
+        this.pos = [tx, tz];
+        step -= d;
+        fo.idx++;
+      } else {
+        this.pos[0] += (dx / d) * step;
+        this.pos[1] += (dz / d) * step;
+        this.heading = Math.atan2(dx, dz);
+        step = 0;
+      }
+    }
+    this.walkingNow = true;
+  }
+
+  // thirst and hunger grow; when they get strong he drops what he's doing and heads for the table
+  needs(dt) {
+    const N = TUNE.needs;
+    const drinks = this.def.drinker && (this.def.wantsDrink?.(this) ?? true);
+    if (drinks) this.thirst = Math.min(100, this.thirst + N.thirst * dt);
+    this.hunger = Math.min(100, this.hunger + N.hunger * dt);
+    const act = this.activity?.id;
+    const interruptible = !act || ['sofa', 'kitchen', 'balcony', 'anime'].includes(act);
+    if (!this.problem && this.mode !== 'walk' && interruptible && (this.thirst > N.wantAt - 15 || this.hunger > N.wantAt - 15)) {
+      if (act === 'sofa') return; // the sofa is next to the table: he reaches from there
+      if (act) this.endActivity(true);
+      if (!this.startActivity('table')) this.startActivity('sofa');
+    }
   }
 
   update(dt) {
@@ -563,7 +680,8 @@ export class Friend extends Walker {
     }
 
     const talking = g.talk?.friend === this;
-    if (talking) {
+    if (this.follow) this.stepFollow(dt);
+    else if (talking) {
       const [ox, oz] = g.olegPos;
       this.heading = Math.atan2(ox - this.pos[0], oz - this.pos[1]);
       if (!this.figure.busy) this.figure.play(Math.random() < 0.3 ? 'laugh' : 'talk', { dur: 2.5 });
@@ -583,6 +701,7 @@ export class Friend extends Walker {
 
     this.def.tick?.(this, g, dt);
     this.fun = clamp(this.fun);
+    this.needs(dt);
     this.chatter(dt);
     this.sounds(dt);
     this.animate(dt);
@@ -593,32 +712,32 @@ export class Friend extends Walker {
     const def = ACTIVITIES[a.id];
     if (!this.problem) this.fun += (def.fun ?? 0) * dt;
 
-    if (a.id === 'table') {
+    if (a.id === 'table' || a.id === 'sofa') { // the sofa is right by the table
       a.t += dt;
       a.plateT += dt;
       const every = TUNE.drinkEvery[this.id];
       const wants = this.def.drinker && (this.def.wantsDrink?.(this) ?? true);
-      if (wants && a.t >= every && this.problem?.id !== 'hog') {
+      const N = TUNE.needs;
+      if (wants && a.t >= every && this.problem?.id !== 'hog' && this.thirst > 15) {
         a.t = 0;
         const tb = g.state.table;
         const kind = tb.beer > 0 && tb.vodka > 0 ? (Math.random() < 0.5 ? 'beer' : 'vodka') : tb.beer > 0 ? 'beer' : tb.vodka > 0 ? 'vodka' : null;
         if (kind) {
           tb[kind] -= 1;
           this.drink(D[kind], D[kind].buzzTime, kind);
-          this.bladder += 12;
-        } else if (this.def.needsBooze !== false) {
-          this.fun -= D.noBooze * every;
-          g.toastOnce('nobooze', 'Бухло на столе кончилось!', 'warn', 12);
-        }
+          this.thirst = Math.max(0, this.thirst - N.sip);
+          this.bladder += TUNE.bladder.sip;
+        } else if (this.def.needsBooze !== false && this.thirst > N.wantAt && !this.problem) this.setProblem(PROBLEMS.want(this, g, 'booze'));
       }
-      if (a.plateT >= D.plateEvery) {
+      if (a.plateT >= D.plateEvery && this.hunger > 20) {
         a.plateT = 0;
         if (g.state.table.food > 0) {
           g.state.table.food -= 1;
-          this.figure.play('eat');
+          this.ate();
           this.fun += D.plate.fun;
+          this.hunger = Math.max(0, this.hunger - N.plate);
           this.drunk = clamp(this.drunk + D.plate.drunk);
-        }
+        } else if (this.hunger > N.wantAt && !this.problem) this.setProblem(PROBLEMS.want(this, g, 'food'));
       }
     }
 
@@ -680,33 +799,34 @@ export class Friend extends Walker {
             if (!this.def.drinker) return g.toast(`${this.name} не пьёт`, 'info');
             g.inv.consume();
             this.drink(TUNE.give[item], TUNE.give[item].buzzTime, item);
-            this.bladder += 15;
+            this.thirst = Math.max(0, this.thirst - TUNE.needs.give);
+            this.bladder += TUNE.bladder.sip;
+            if (this.problem?.id === 'wantBooze') this.clearProblem(true);
           },
         });
       } else if (item === 'food') {
         list.push({
           key: 'E', text: 'Накормить',
           run: () => {
+            const part = g.inv.selectedPortion();
             g.inv.consume();
-            this.figure.play('eat');
-            this.fun += TUNE.give.food.fun;
+            this.ate();
+            this.fun += TUNE.give.food.fun * part;
+            this.hunger = Math.max(0, this.hunger - TUNE.needs.give * part);
+            if (this.problem?.id === 'wantFood') this.clearProblem(true);
             this.drunk = clamp(this.drunk + TUNE.give.food.drunk);
           },
         });
       }
-      if (this.talkCooldown <= 0 && !this.problem) {
+      if (this.talkCooldown <= 0 && !this.problem && this.unusedMonolog()) {
         list.push({
           key: 'R', text: 'Потрещать',
           run: () => {
-            const h = this.voice('monolog', { gain: 1.1 });
-            if (!h) {
-              // no recording: a quick chat
-              this.fun += 4;
-              g.oleg.fun += 2;
-              this.talkCooldown = 8;
-              this.figure.play(this.fun > 60 ? 'laugh' : 'talk');
-              return;
-            }
+            // each story is told once a night; when he has told them all, there's nothing to talk about
+            const src = this.unusedMonolog();
+            const h = src && this.voice('monolog', { gain: 1.1, src });
+            if (!h) return;
+            g.usedClips.add(src);
             // he tells his story: Oleg has to stand and listen for the first half
             this.fun += TUNE.talk.fun;
             g.oleg.fun += TUNE.talk.olegFun;
@@ -739,6 +859,7 @@ export class Cat extends Walker {
 
   get statusText() {
     if (this.gone) return 'ВЫПАЛ С БАЛКОНА';
+    if (this.carried) return 'у тебя на руках';
     if (this.problem) return this.problem.short;
     if (this.playLeft > 0) return 'играет с мышкой';
     return this.mode === 'walk' ? 'гуляет' : 'сидит';
@@ -762,10 +883,50 @@ export class Cat extends Walker {
     if (helped) this.game.olegHelped();
   }
 
+  // picked up: he's in Oleg's hands (an inventory slot), calm, and goes wherever Oleg goes
+  pickUp() {
+    const g = this.game;
+    if (!g.inv.add('cat')) return false;
+    if (this.problem?.id === 'rail') this.clearProblem(true);
+    else if (this.problem) this.clearProblem(false);
+    this.carried = true;
+    this.path = null;
+    this.mode = 'idle';
+    this.railT = 0;
+    this.balconyT = 0;
+    this.figure.root.visible = false;
+    g.sfx.purr();
+    return true;
+  }
+
+  photoMoment() {
+    if (this.carried || this.gone) return null;
+    if (this.problem?.id === 'rail') return { cat: 'catWindow', caption: 'Кот лезет в окно' };
+    if (this.playLeft > 0) return { cat: 'catToy', caption: 'Кот играет с мышкой' };
+    return null;
+  }
+
+  // put down in front of Oleg
+  putDown(x, z) {
+    this.carried = false;
+    this.pos = [x, z];
+    this.node = nearestNode(x, z);
+    this.spot = { id: 'floor', node: this.node, p: [x, z], pose: null };
+    this.y = 0;
+    this.mode = 'idle';
+    this.idleLeft = rand(4, 8);
+    this.figure.root.visible = true;
+  }
+
   update(dt) {
     if (this.gone) return;
     const g = this.game, C = TUNE.cat;
     this.t += dt;
+    if (this.carried) {
+      this.pos = [...g.olegPos];
+      this.fun = clamp(this.fun + C.heldFun * dt);
+      return;
+    }
     if (this.playLeft > 0) {
       this.playLeft -= dt;
       this.fun += C.toyFun * dt;
@@ -812,26 +973,14 @@ export class Cat extends Walker {
   }
 
   actions(g) {
-    if (this.gone) return [];
-    const onBalcony = this.room?.id === 'balcony';
-    if (onBalcony) {
-      return [{
-        key: 'E', text: this.problem?.id === 'rail' ? 'Снять с окна!' : 'Забрать кота с балкона',
-        run: () => {
-          this.clearProblem(this.problem?.id === 'rail');
-          this.railT = 0;
-          this.balconyT = 0;
-          this.path = null;
-          this.mode = 'idle';
-          this.place(CAT_SPOTS.catRug);
-          g.toast('Кот в зале, в безопасности', 'good');
-        },
-      }];
-    }
-    const list = [];
+    if (this.gone || this.carried) return [];
+    const list = [{
+      key: 'E', text: this.problem?.id === 'rail' ? 'Схватить кота с окна!' : 'Взять на руки', cost: TUNE.cost.catRescue,
+      run: () => this.pickUp(),
+    }];
     if (this.playLeft <= 0) {
       list.push({
-        key: 'E', text: 'Погладить',
+        key: 'T', text: 'Погладить', cost: TUNE.cost.petCat,
         run: () => {
           this.fun += TUNE.cat.pet;
           g.oleg.fun += 2;

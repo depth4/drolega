@@ -4,6 +4,7 @@ import * as THREE from 'three';
 import { mat } from './apartment.js';
 import { drawFace, faceAspect, hasMoodFaces, moodState, moodFace } from './faces.js';
 import { createRig } from './anim.js';
+import { iconTexture } from '../ui/icons.js';
 import { skinMaterials } from './skins.js';
 
 export function textSprite(text, { bg = 'rgba(20,18,24,0.78)', fg = '#fff', size = 40, scale = 0.001 } = {}) {
@@ -35,7 +36,7 @@ export function textSprite(text, { bg = 'rgba(20,18,24,0.78)', fg = '#fff', size
 
 // Name tag, problem bubble and speech bubble shared by both character styles.
 function makeTags(root, name, label) {
-  let nameTag = null, bubble = null, bubbleText = null, speech = null, speechLeft = 0;
+  let nameTag = null, bubble = null, bubbleText = null, speech = null, speechLeft = 0, bounce = 0;
   let baseY = 2.0;
   if (label) {
     nameTag = textSprite(name);
@@ -43,7 +44,7 @@ function makeTags(root, name, label) {
   }
   const place = () => {
     if (nameTag) nameTag.position.y = baseY;
-    if (bubble) bubble.position.y = baseY + 0.28;
+    if (bubble) bubble.position.y = baseY + 0.3;
     if (speech) speech.position.y = baseY + (bubble ? 0.56 : 0.28);
   };
   place();
@@ -52,19 +53,24 @@ function makeTags(root, name, label) {
       baseY = y;
       place();
     },
-    setStatus(text, color = '#c0392b') {
-      if (text === bubbleText) return;
+    // a problem shows as a bouncing "!" next to him; what exactly is wrong you see when you look at him
+    setStatus(text) {
+      if (!!text === !!bubbleText) return (bubbleText = text);
       bubbleText = text;
       if (bubble) {
         root.remove(bubble);
-        bubble.material.map.dispose();
         bubble = null;
       }
       if (text) {
-        bubble = textSprite(`! ${text}`, { bg: color, size: 36 });
+        bubble = new THREE.Sprite(new THREE.SpriteMaterial({ map: iconTexture('alert'), transparent: true, depthTest: false, sizeAttenuation: false }));
+        bubble.scale.set(0.055, 0.055, 1);
+        bubble.renderOrder = 11;
         root.add(bubble);
       }
       place();
+    },
+    showName(v) {
+      if (nameTag) nameTag.visible = v;
     },
     say(text, seconds = 3.5) {
       if (speech) root.remove(speech);
@@ -74,6 +80,12 @@ function makeTags(root, name, label) {
       place();
     },
     tick(dt) {
+      if (bubble) {
+        bounce += dt;
+        bubble.position.y = baseY + 0.3 + Math.abs(Math.sin(bounce * 5)) * 0.08;
+        const s = 0.055 + 0.008 * Math.sin(bounce * 10);
+        bubble.scale.set(s, s, 1);
+      }
       if (speech && (speechLeft -= dt) <= 0) {
         root.remove(speech);
         speech.material.map.dispose();
@@ -249,16 +261,19 @@ export function makeCat() {
   const root = new THREE.Group();
   const body = new THREE.Group();
   root.add(body);
-  const fur = mat('#d98b3a', { roughness: 1 });
-  const dark = mat('#8a4f1d', { roughness: 1 });
-  body.add(new THREE.Mesh(new THREE.CapsuleGeometry(0.09, 0.22, 4, 8).rotateX(Math.PI / 2).translate(0, 0.16, 0), fur));
+  // black Persian: a fluffy round body, flat face, big orange eyes
+  const fur = mat('#1f1916', { roughness: 1 });
+  const dark = mat('#120e0c', { roughness: 1 });
+  body.add(new THREE.Mesh(new THREE.CapsuleGeometry(0.115, 0.2, 6, 10).rotateX(Math.PI / 2).translate(0, 0.17, 0), fur));
   const head = new THREE.Group();
   head.position.set(0, 0.26, 0.17);
   body.add(head);
-  head.add(new THREE.Mesh(new THREE.SphereGeometry(0.08, 12, 10), fur));
-  for (const x of [-0.045, 0.045]) {
-    head.add(new THREE.Mesh(new THREE.ConeGeometry(0.03, 0.06, 4).translate(x, 0.08, 0), dark));
-    head.add(new THREE.Mesh(new THREE.SphereGeometry(0.012, 6, 4).translate(x * 0.8, 0.015, 0.07), mat('#1b3b1b')));
+  head.add(new THREE.Mesh(new THREE.SphereGeometry(0.095, 14, 12).scale(1.1, 0.95, 0.85), fur));
+  const eye = new THREE.MeshStandardMaterial({ color: '#f08a1c', emissive: '#7a3a00', emissiveIntensity: 0.6, roughness: 0.2 });
+  for (const x of [-0.04, 0.04]) {
+    head.add(new THREE.Mesh(new THREE.ConeGeometry(0.022, 0.035, 4).translate(x * 1.4, 0.08, -0.01), dark)); // small Persian ears
+    head.add(new THREE.Mesh(new THREE.SphereGeometry(0.02, 10, 8).translate(x, 0.01, 0.075), eye));
+    head.add(new THREE.Mesh(new THREE.SphereGeometry(0.009, 6, 4).translate(x, 0.01, 0.092), mat('#050505')));
   }
   const legs = [];
   for (const [x, z] of [[-0.05, 0.1], [0.05, 0.1], [-0.05, -0.1], [0.05, -0.1]]) {
@@ -267,7 +282,7 @@ export function makeCat() {
     body.add(leg);
     legs.push(leg);
   }
-  const tail = new THREE.Mesh(new THREE.CylinderGeometry(0.014, 0.01, 0.28).translate(0, 0.14, 0), dark);
+  const tail = new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.02, 0.26, 8).translate(0, 0.13, 0), fur); // bushy
   tail.position.set(0, 0.2, -0.17);
   tail.rotation.x = -0.6;
   body.add(tail);
@@ -278,15 +293,17 @@ export function makeCat() {
   let bubble = null, bubbleText = null;
   return {
     root,
-    setStatus(text, color = '#c0392b') {
-      if (text === bubbleText) return;
+    setStatus(text) {
+      if (!!text === !!bubbleText) return (bubbleText = text);
       bubbleText = text;
       if (bubble) {
         root.remove(bubble);
         bubble = null;
       }
       if (!text) return;
-      bubble = textSprite(`! ${text}`, { bg: color, size: 34 });
+      bubble = new THREE.Sprite(new THREE.SpriteMaterial({ map: iconTexture('alert'), transparent: true, depthTest: false, sizeAttenuation: false }));
+      bubble.scale.set(0.05, 0.05, 1);
+      bubble.renderOrder = 11;
       bubble.position.y = 0.85;
       root.add(bubble);
     },

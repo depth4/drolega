@@ -23,9 +23,9 @@ export const TUNE = {
   },
 
   fun: {
-    boredom: 0.45, // everyone loses this much fun per second
+    boredom: 0.38, // everyone loses this much fun per second
     music: 0.9, // bonus in the living room while music plays
-    olegBoredom: 0.5,
+    olegBoredom: 0.35,
     helpBonus: 8, // Oleg's fun for solving someone's problem
   },
 
@@ -50,7 +50,27 @@ export const TUNE = {
 
   oleg: { drunkDecay: 0.8, blackoutAt: 95, blackoutSeconds: 4 },
 
-  bladder: { base: 0.6, waitMax: 15 },
+  // Oleg's strength: every real action costs some, it comes back by itself; food and a drink give a boost
+  energy: { max: 100, regen: 1.8, fromFood: 35, fromBeer: 12, fromVodka: 6 },
+  // Oleg wants a drink too: thirst grows, and when it's high his fun melts; a drink (Q) quenches it
+  olegThirst: { rate: 0.9, from: 60, drain: 1.6, beer: 55, vodka: 80 },
+  cost: {
+    takeBottle: 6, comfort: 6, lead: 8, fan: 6, wake: 10, pat: 8, shower: 14, repair: 14, mop: 10,
+    cook: 12, drain: 6, petCat: 4, catRescue: 5,
+  },
+  // photos on Oleg's phone: catch a moment (someone puking, dancing, asleep...) — each kind once a night,
+  // 3 shots a night, then "память заполнена"
+  photo: { perNight: 3, fun: 8, friendFun: 6, range: 7, cone: 0.32 },
+
+  // hands-on actions (hold the left mouse button): strength spent per second / per pat
+  hands: { hoseLength: 4.6, sprayRange: 3.2, sprayCost: 5, soak: 0.28, scrubCost: 4, scrubRate: 0.0022, patCost: 3, pats: 5, shakeCost: 5, shakeRate: 0.004 },
+  // mini-games slow the world down instead of pausing it
+  minigame: { timeScale: 0.35 },
+
+  bladder: { base: 0.3, waitMax: 18, sip: 7 },
+
+  // the guys get thirsty and hungry and go to the table by themselves; an empty table = a "!"
+  needs: { thirst: 1.3, hunger: 0.6, goAt: 55, wantAt: 90, sip: 30, plate: 45, give: 70 },
 
   // "Коч!" chain: someone yells, others pick it up with a fading chance
   koch: { firstAfter: 25, every: [35, 60], chance: 0.85, decay: 0.8, max: 6, fun: 5, olegFun: 2, noise: 6 },
@@ -97,10 +117,10 @@ export const TUNE = {
   delivery: { min: 15, max: 30 }, // seconds; not opening the door = courier leaves, money is gone
 
   shop: [
-    { id: 'beer', title: 'Пиво ×4', note: 'держит долго, пьянит медленно', price: 800, gives: { beer: 4 } },
-    { id: 'vodka', title: 'Водка 0,5', note: 'дёшево, пьянит быстро', price: 400, gives: { vodka: 1 } },
-    { id: 'pizza', title: 'Пицца', note: 'готовая, сразу на стол', price: 700, gives: { food: 1 } },
-    { id: 'pelmeni', title: 'Пельмени', note: 'дёшево, но варить на плите', price: 250, gives: { pelmeni: 1 } },
+    { id: 'beer', icon: 'beer', title: 'Пиво ×4', note: 'держит долго, пьянит медленно', price: 800, gives: { beer: 4 } },
+    { id: 'vodka', icon: 'vodka', title: 'Водка 0,5', note: 'дёшево, пьянит быстро', price: 400, gives: { vodka: 1 } },
+    { id: 'pizza', icon: 'pizza', title: 'Пицца', note: 'готовая, сразу на стол', price: 700, gives: { food: 1 } },
+    { id: 'pelmeni', icon: 'pelmeni', title: 'Пельмени', note: 'дёшево, но варить и сливать самому', price: 250, gives: { pelmeni: 1 } },
     { id: 'pills', title: 'Таблетки от ЗПП', note: 'скоро', price: 600, gives: { pills: 1 }, soon: true },
   ],
 
@@ -115,6 +135,7 @@ export const TUNE = {
 
   cat: {
     boredom: 0.7,
+    heldFun: 1.5, // calms down in Oleg's hands
     pet: 20, // quick but small
     toyPlay: 25, // seconds of play
     toyFun: 2.5, // per second while playing

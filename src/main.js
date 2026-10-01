@@ -8,6 +8,10 @@ import { Game } from './game/game.js';
 import { Player } from './player.js';
 import { makeFX } from './fx.js';
 import { createHUD } from './ui/hud.js';
+import { createViewmodel } from './world/viewmodel.js';
+import { createMirror } from './world/mirror.js';
+import { moodFace } from './world/faces.js';
+import { iconURL } from './ui/icons.js';
 import * as audio from './audio.js';
 import { TUNE, BIRTHDAY } from './config.js';
 
@@ -38,8 +42,21 @@ scene.add(apt.group, furn.group);
 
 const game = new Game({ scene, apt, furn, sfx: audio.sfx, voices: audio.voices });
 const player = new Player(camera, [...apt.colliders, ...furn.colliders]);
+scene.add(camera); // the first-person hands hang off the camera
+const hands = createViewmodel(camera);
+let mirror = null; // created at boot, once the head style is known
 const fx = makeFX(renderer, scene, camera);
 const hud = createHUD({ onBuy: (id) => game.buy(id) });
+// close-up hands-on scenes (pelmeni): the mouse is free, the camera flies in, the world slows down
+const focusActive = () => !!game.cooking.focus;
+const mini = { get active() { return focusActive(); } };
+const mouseNdc = new THREE.Vector2();
+canvas.addEventListener('mousemove', (e) => {
+  const r = canvas.getBoundingClientRect();
+  mouseNdc.set(((e.clientX - r.left) / r.width) * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1);
+});
+// warm up the mood faces so mini-games and heads show them right away
+for (const who of ['alexey', 'lyokha', 'kirill', 'temych']) for (const st of ['default', 'happy', 'angry', 'sad', 'doing']) moodFace(who, st);
 window.__game = game; // handy in the console
 window.__player = player;
 window.__spots = SPOTS;
@@ -69,6 +86,7 @@ function show(id, v) {
 
 function startNight(n) {
   game.startNight(n);
+  setPhotoMode(false);
   player.place(START.x, START.z, START.yaw);
   hud.reset();
   started = true;
@@ -135,6 +153,9 @@ game.onEnd = (res) => {
   $('end-title').textContent = last ? BIRTHDAY.title : res.win ? 'Пережил ночь!' : 'Провал';
   $('end-reason').textContent = last ? BIRTHDAY.lines.join(' ') : res.reason;
   $('end-stats').innerHTML = `Помог пацанам: ${st.stats.helped} раз<br>Потрачено на доставку: ${st.stats.spent} ₽ · на взятки: ${st.stats.bribes} ₽<br>Осталось денег: ${st.money} ₽ · хата: ${Math.round(st.hut)}%`;
+  $('end-photos').innerHTML = st.photos
+    .map((p, i) => `<figure style="--r:${(i % 2 ? 1 : -1) * (2 + i)}deg"><img src="${p.img}" alt=""><figcaption>${p.caption}</figcaption></figure>`)
+    .join('');
   $('btn-next').textContent = last ? 'Сначала' : res.win ? `Ночь ${res.night + 1}` : 'Ещё раз';
   if (last) game.night = 0;
   show('end', true);
@@ -147,6 +168,7 @@ $('btn-orbit').addEventListener('click', toOrbit);
 const STYLE_NAMES = { box: 'Бошки: кубы', sprite: 'Бошки: плоские (как в Doom)' };
 function setStyle(style) {
   game.restyle(style);
+  mirror?.restyle(style);
   $('btn-style').textContent = STYLE_NAMES[style];
   try {
     localStorage.setItem('oleg-style', style);
@@ -171,14 +193,81 @@ $('phone-close').addEventListener('click', () => setPhone(false));
 
 document.addEventListener('pointerlockchange', () => {
   locked = document.pointerLockElement === canvas;
-  if (!locked && mode === 'play' && !phoneOpen) pause();
+  if (!locked && mode === 'play' && !phoneOpen && !mini.active) pause();
 });
 document.addEventListener('mousemove', (e) => {
   if (mode !== 'play' || phoneOpen) return;
-  if ((locked || dragging) && !game.talkLocked) player.look(e.movementX, e.movementY);
+  use.mx += e.movementX;
+  use.my += e.movementY;
+  use.fx = (use.fx ?? 0) + e.movementX;
+  use.fy = (use.fy ?? 0) + e.movementY;
+  // while scrubbing or shaking someone the mouse moves the hand, not the view
+  if (use.down && use.busy) return;
+  if ((locked || dragging) && !game.talkLocked && !mini.active) player.look(e.movementX, e.movementY);
 });
+// ---------- photo mode: C (or "Снять" in the phone) ----------
+let photoMode = false;
+let snapRequested = false;
+function setPhotoMode(on) {
+  photoMode = on;
+  show('viewfinder', on);
+  if (on) {
+    setPhone(false);
+    $('vf-count').textContent = `${game.state.photos.length}/${TUNE.photo.perNight}`;
+  }
+}
+$('tab-photo').addEventListener('click', () => setPhotoMode(true));
+$('ico-photo').src = iconURL('camera');
+const losRay = new THREE.Raycaster();
+function snap() {
+  // what's in frame: friends/cat doing something photogenic, close to the centre, not behind a wall
+  const origin = camera.getWorldPosition(new THREE.Vector3());
+  const dir = camera.getWorldDirection(new THREE.Vector3());
+  const P = TUNE.photo;
+  const subjects = [];
+  for (const f of [...game.friends, game.cat]) {
+    const moment = f.photoMoment?.();
+    if (!moment) continue;
+    const pt = new THREE.Vector3(f.pos[0], f.figure.pose === 'lie' ? 0.6 : f === game.cat ? 0.3 : 1.4, f.pos[1]);
+    const to = pt.clone().sub(origin);
+    const dist = to.length();
+    const ang = Math.acos(Math.min(1, to.normalize().dot(dir)));
+    if (dist > P.range || ang > P.cone) continue;
+    losRay.set(origin, to);
+    losRay.far = dist - 0.3;
+    if (losRay.intersectObject(apt.group, true).length) continue;
+    subjects.push({ f, moment, ang });
+  }
+  subjects.sort((a, b) => a.ang - b.ang);
+  // thumbnail from the frame just rendered
+  const t = document.createElement('canvas');
+  t.width = 320;
+  t.height = 200;
+  const cw = canvas.width, ch = canvas.height, w = Math.min(cw, ch * 1.6);
+  t.getContext('2d').drawImage(canvas, (cw - w) / 2, (ch - w / 1.6) / 2, w, w / 1.6, 0, 0, 320, 200);
+  const photo = game.takePhoto(subjects, t.toDataURL('image/jpeg', 0.8));
+  $('vf-count').textContent = `${game.state.photos.length}/${TUNE.photo.perNight}`;
+  if (!photo) return;
+  $('flash').classList.add('on');
+  requestAnimationFrame(() => $('flash').classList.remove('on'));
+  $('polaroid-img').src = photo.img;
+  $('polaroid-cap').textContent = photo.caption;
+  show('polaroid', true);
+  clearTimeout(snap.t);
+  snap.t = setTimeout(() => show('polaroid', false), 3000);
+}
+
+// left button while playing: hands-on actions (spray, scrub, pat, shake)
+const use = { down: false, pressed: false, mx: 0, my: 0 };
+document.addEventListener('mousedown', (e) => {
+  if (e.button !== 0 || mode !== 'play' || phoneOpen || (!locked && !focusActive())) return;
+  if (photoMode) return void (snapRequested = true);
+  use.down = true;
+  use.pressed = true;
+});
+document.addEventListener('mouseup', (e) => e.button === 0 && (use.down = false));
 canvas.addEventListener('mousedown', () => {
-  if (mode === 'play' && !locked && !phoneOpen) dragging = true;
+  if (mode === 'play' && !locked && !phoneOpen && !focusActive()) dragging = true;
 });
 addEventListener('mouseup', () => (dragging = false));
 addEventListener('wheel', (e) => mode === 'play' && game.inv.select(game.inv.sel + Math.sign(e.deltaY)));
@@ -189,19 +278,31 @@ addEventListener('keydown', (e) => {
   player.keys.add(e.code);
   if (e.repeat) return;
   const k = e.code;
+  if (focusActive()) {
+    if (k === 'Escape') game.cooking.cancel();
+    return;
+  }
+  if (k === 'KeyC' && !phoneOpen) return setPhotoMode(!photoMode);
+  if (photoMode && k === 'Escape') return setPhotoMode(false);
   if (k === 'KeyF') return setPhone(!phoneOpen);
+  if (phoneOpen && (k === 'ArrowLeft' || k === 'KeyA')) return hud.shopStep(-1);
+  if (phoneOpen && (k === 'ArrowRight' || k === 'KeyD')) return hud.shopStep(1);
   if (k === 'Escape') return phoneOpen ? setPhone(false) : pause();
   if (phoneOpen || game.oleg.blackout > 0 || game.talkLocked) return;
   if (k.startsWith('Digit')) {
     const n = Number(k.slice(5));
     if (n >= 1 && n <= 4) game.inv.select(n - 1);
   }
+  if (k === 'KeyQ' && game.inv.selectedItem() && ['beer', 'vodka', 'food'].includes(game.inv.selectedItem())) hands.play('drink');
   if (k === 'KeyQ') game.useSelf();
   if (k === 'KeyG') game.inv.drop();
   const key = { KeyE: 'E', KeyR: 'R', KeyT: 'T' }[k];
   const act = key && currentActions.find((a) => a.key === key);
   if (act) {
+    // plain actions pay here; mini-game actions pay when the game opens (game.minigame)
+    if (act.cost && !act.mini && !game.spend(act.cost)) return;
     act.run();
+    hands.play('use');
     audio.sfx.click();
   }
 });
@@ -227,11 +328,16 @@ function visibleChain(o) {
   for (; o; o = o.parent) if (!o.visible) return false;
   return true;
 }
+let aimPoint = null;
+let wasFocused = false;
+const focusRay = new THREE.Raycaster();
 function findTarget() {
   ray.setFromCamera(center, camera);
+  aimPoint = null;
   for (const hit of ray.intersectObjects(pickRoots, true)) {
     if (!visibleChain(hit.object)) continue;
     if (hit.object.isSprite && !hit.object.parent?.userData.target) continue; // labels don't block
+    aimPoint = hit.point;
     for (let o = hit.object; o; o = o.parent) if (o.userData.target) return o.userData.target;
     return null; // a wall or something without a target is in the way
   }
@@ -253,7 +359,7 @@ function frame(now) {
   time += dt;
 
   if (mode === 'play') {
-    game.update(dt);
+    game.update(mini.active ? dt * TUNE.minigame.timeScale : dt);
     // listening to a story: Oleg turns to the guy and can't walk away until the lock ends
     const listening = game.talkLocked;
     if (listening) {
@@ -264,9 +370,51 @@ function frame(now) {
       player.yaw += dy * Math.min(1, dt * 6);
       player.pitch += (-0.12 - player.pitch) * Math.min(1, dt * 4);
     }
-    player.update(dt, { drunk: game.oleg.drunk, canMove: !phoneOpen && !(game.oleg.blackout > 0) && !listening });
+    if (focusActive()) {
+      // fly to the close-up and hand the mouse over to the objects
+      if (locked) document.exitPointerLock?.();
+      const f = game.cooking.focus;
+      camera.position.lerp(f.cam.pos, Math.min(1, dt * 6));
+      const q = camera.quaternion.clone();
+      camera.lookAt(f.cam.look);
+      const want = camera.quaternion.clone();
+      camera.quaternion.copy(q).slerp(want, Math.min(1, dt * 6));
+      wasFocused = true;
+    } else {
+      if (wasFocused) {
+        wasFocused = false;
+        lock();
+      }
+      player.update(dt, { drunk: game.oleg.drunk, canMove: !phoneOpen && !(game.oleg.blackout > 0) && !listening });
+    }
+    focusRay.setFromCamera(focusActive() ? mouseNdc : center, camera);
+    game.cooking.update(dt, { ray: focusRay.ray, down: use.down, dx: use.fx, dy: use.fy });
+    use.fx = use.fy = 0;
+    if (focusActive()) hud.setUse({ label: game.cooking.hint(), progress: game.cooking.progress(), top: true });
+    const k = player.keys;
+    hands.update(dt, {
+      item: game.inv.selectedItem(),
+      moving: !listening && !mini.active && !phoneOpen && ['KeyW', 'KeyA', 'KeyS', 'KeyD'].some((c) => k.has(c)),
+      speed: k.has('ShiftLeft') || k.has('ShiftRight') ? 1.5 : 1,
+      drunk: game.oleg.drunk,
+      visible: !phoneOpen && !mini.active && !photoMode && !(game.oleg.blackout > 0),
+      yaw: player.yaw,
+      pitch: player.pitch,
+    });
+    mirror?.update(dt, { x: player.x, z: player.z, yaw: player.yaw, moving: ['KeyW', 'KeyA', 'KeyS', 'KeyD'].some((c) => k.has(c)), drunk: game.oleg.drunk, item: game.inv.selectedItem() });
     game.olegPos = [player.x, player.z];
-    const target = phoneOpen ? null : findTarget();
+    game.olegYaw = player.yaw;
+    const target = phoneOpen || mini.active ? null : findTarget();
+    // hands-on: aim + left button
+    const origin = camera.getWorldPosition(new THREE.Vector3());
+    const dir = camera.getWorldDirection(new THREE.Vector3());
+    const handHud = game.hands.update(dt, { down: use.down, pressed: use.pressed, mx: use.mx, my: use.my, target, origin, dir, hand: hands.tip() });
+    const held = game.inv.selectedItem();
+    use.busy = (held === 'mop' && target?.puddle) || (!held && target?.friend?.problem?.id === 'sleep');
+    hands.setActivity({ spray: held === 'shower' && use.down, scrub: use.down && held === 'mop' && target?.puddle ? 1 : 0, shake: use.down && !held && target?.friend?.problem?.id === 'sleep' ? 1 : 0, mx: use.mx, my: use.my });
+    use.pressed = false;
+    use.mx = use.my = 0;
+    if (!focusActive()) hud.setUse(handHud);
     currentActions = target?.actions?.() ?? [];
     hudT -= dt;
     if (hudT <= 0 || target !== hud.lastTarget) {
@@ -277,6 +425,7 @@ function frame(now) {
     audio.setMusic(game.state.music && !game.hushed); // the music goes quiet while someone knocks
     audio.voices.update([player.x, player.z]);
   } else {
+    hands.root.visible = false;
     audio.setMusic(false);
     audio.voices.stopAll();
     if (mode === 'orbit') orbit.update();
@@ -289,6 +438,10 @@ function frame(now) {
 
   if (mode === 'orbit') renderer.render(scene, orbitCam);
   else fx.render();
+  if (snapRequested) {
+    snapRequested = false;
+    if (mode === 'play') snap();
+  }
 
   const r = mode === 'play' && hud.camRect();
   if (r) {
@@ -318,6 +471,7 @@ try {
 }
 if (!STYLE_NAMES[game.style]) game.style = 'box';
 $('btn-style').textContent = STYLE_NAMES[game.style];
+mirror = createMirror({ furn, scene, hands, style: game.style });
 startNight(Number(params.get('night')) || 1);
 started = false; // the menu offers "start", not "continue"
 player.update(0);
