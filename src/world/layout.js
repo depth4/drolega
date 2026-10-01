@@ -25,6 +25,9 @@ export const mfacing = (f) => (MIRROR && f ? { '+x': '-x', '-x': '+x' }[f] ?? f 
 const srect = (q) => ({ ...q, x0: sc(q.x0), x1: sc(q.x1), z0: sc(q.z0), z1: sc(q.z1) });
 const wrect = (q) => mrect(srect(q)); // plan rect -> world
 const wpt = ([x, z]) => [mx(sc(x)), sc(z)]; // plan point -> world
+// for the outside (stairwell, street, shop): authored in plan coords like everything else
+export const planToWorld = { rect: (x0, x1, z0, z1) => wrect({ x0, x1, z0, z1 }), pt: (x, z) => wpt([x, z]), len: sc };
+export const worldToPlan = (x, z) => [(MIRROR ? WS - x : x) / SCALE, z / SCALE];
 
 export const H = 2.7; // ceiling height (a bit higher than the real 2.5 so the stretched rooms don't feel low)
 export const DOOR_H = 2.1;
@@ -90,7 +93,7 @@ const PLAN_WALLS = [
   // stairwell landing outside the front door (visitors stand here, the door camera looks at it)
   { id: 'landing-far', ext: true, ...r(10.7, 10.9, 3.7, 6.3) },
   { id: 'landing-n', ext: true, ...r(8.5, 10.9, 3.5, 3.7) },
-  { id: 'landing-s', ext: true, ...r(8.5, 10.9, 6.3, 6.5) },
+  { id: 'landing-s', ext: true, ...r(8.5, 10.9, 6.3, 6.5), openings: [{ at: [8.65, 10.55], bottom: 0, top: DOOR_H + 0.2 }] }, // to the stairs down (outside.js)
   { id: 'landing-gap', ext: true, ...r(8.1, 8.5, 5.92, 6.5) },
 ];
 

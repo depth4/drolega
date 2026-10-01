@@ -36,6 +36,10 @@ function item(type) {
     c.rotation.set(0, Math.PI * 0.6, 0);
     c.position.set(-0.12, -0.12, -0.05);
     g.add(c);
+  } else if (type === 'pelmeni') {
+    // a pack of frozen pelmeni
+    g.add(new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.22, 0.05).translate(0, 0.08, 0), mat('#e8eef8', { roughness: 0.6 })));
+    g.add(new THREE.Mesh(new THREE.BoxGeometry(0.161, 0.07, 0.051).translate(0, 0.12, 0), mat('#2f5fb8')));
   } else if (type === 'bucket' || type === 'water') {
     // held by the handle, hanging below the fist
     const b = makeBucket();

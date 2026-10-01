@@ -12,6 +12,7 @@ import { Cooking } from './cooking.js';
 import { PartyEvents } from './events.js';
 import { PC } from './pc.js';
 import { Living } from './living.js';
+import { Shop } from './shop.js';
 
 export const ITEMS = {
   beer: { name: 'Пиво', icon: '🍺' },
@@ -23,6 +24,7 @@ export const ITEMS = {
   tools: { name: 'Инструменты', icon: '🔧' },
   toy: { name: 'Мышка', icon: '🐭' },
   bucket: { name: 'Ведро', icon: '🪣' },
+  pelmeni: { name: 'Пельмени', icon: '🥟' },
   water: { name: 'Ведро воды', icon: '🪣' },
 };
 
@@ -79,6 +81,12 @@ class Inventory {
     if (!item) return;
     this.slots[this.sel] = null;
     if (item === 'shower') return this.game.hands.returnShower();
+    // outside the flat there's no fridge to put it back in: in the shop it goes back on the shelf
+    if (this.game.outside && roomAt(...this.game.olegPos) == null) {
+      if (this.game.shop?.putBack(item)) return this.game.toast('Положил обратно на полку', 'info');
+      if (['beer', 'vodka', 'food', 'pelmeni'].includes(item)) return this.game.toast('Выкинул. Ну такое', 'warn');
+    }
+    if (item === 'pelmeni') return void this.game.state.fridge.pelmeni++;
     if (item === 'toy') this.game.dropToy();
     else if (item === 'bucket' || item === 'water') this.game.dropBucket(item === 'water');
     else if (item === 'cat') this.game.dropCat();
@@ -121,6 +129,12 @@ export class Game {
     this.events = new PartyEvents(this);
     this.pc = new PC(this);
     this.living = new Living(this);
+  }
+
+  // the stairwell, the yard and the shop (built in main.js, see world/outside.js)
+  attachOutside(out) {
+    this.outside = out;
+    this.shop = new Shop(this, out);
   }
 
   // ---------- partying (Oleg is at the party too) ----------
@@ -451,6 +465,7 @@ export class Game {
     this.events?.reset();
     this.pc?.reset();
     this.living?.reset();
+    this.shop?.reset();
     this.placeBucket(...this.bucketHome);
     for (const p of this.puddles ?? []) this.dynamic.remove(p);
     this.puddles = [];
@@ -1022,7 +1037,8 @@ export class Game {
     T('fridge', {
       info: () => `Пиво ${fr().beer} · Водка ${fr().vodka} · Еда ${fr().food} · Пельмени ${fr().pelmeni}`,
       actions: () => [
-        fr().beer > 0 && { key: 'E', text: 'Взять пиво', run: () => this.inv.add('beer') && fr().beer-- },
+        this.inv.selectedItem() === 'pelmeni' && { key: 'E', text: 'Положить пельмени в морозилку', run: () => (this.inv.consume(), fr().pelmeni++) },
+        this.inv.selectedItem() !== 'pelmeni' && fr().beer > 0 && { key: 'E', text: 'Взять пиво', run: () => this.inv.add('beer') && fr().beer-- },
         fr().vodka > 0 && { key: 'R', text: 'Взять водку', run: () => this.inv.add('vodka') && fr().vodka-- },
         fr().food > 0 && { key: 'T', text: 'Взять еду', run: () => this.inv.add('food') && fr().food-- },
       ].filter(Boolean),
@@ -1258,6 +1274,7 @@ export class Game {
     this.updateToy(dt);
     this.events.update(dt);
     this.living.update(dt);
+    this.shop?.update(dt, this.olegPos);
     this.cat.update(dt);
     for (const d of Object.values(this.doors)) d.update(dt);
     if (this.entranceCloseT > 0) {

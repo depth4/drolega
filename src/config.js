@@ -155,6 +155,9 @@ export const TUNE = {
 
   delivery: { min: 15, max: 30 }, // seconds; not opening the door = courier leaves, money is gone
 
+  // "Продукты 24" across the yard: per item, cheaper than the courier (a beer bottle = 2 servings)
+  store: { beer: 90, vodka: 200, pelmeni: 120, chips: 60 },
+
   shop: [
     { id: 'beer', icon: 'beer', title: 'Пиво ×4', note: 'держит долго, пьянит медленно', price: 600, gives: { beer: 4 } },
     { id: 'vodka', icon: 'vodka', title: 'Водка 0,5', note: 'дёшево, пьянит быстро', price: 300, gives: { vodka: 1 } },

@@ -14,6 +14,7 @@ Browser 3D game (three.js + Vite, vanilla JS), a birthday gift. FNAF × Who's Yo
   - Everything is authored in **plan coordinates** (as on the BTI drawing), then stretched by `SCALE` (the real size felt cramped in first person) and mirrored on export (`MIRROR = true`). Never hand-mirror or hand-scale numbers.
   - Furniture keeps its real size: whatever touches a wall on the drawing stays against it after scaling (`fitFurniture`). Spots with `on: '<furnitureId>'` move with that furniture.
   - +X is right on the drawing, +Z is down (away from the windows), meters.
+- `src/world/outside.js` is outside the flat (he lives on the 2nd floor): stairs down from the landing, lobby, the yard, the "Продукты 24" kiosk; `heightAt(x, z)` gives the floor height (the player follows it), `zoneName()` the place name. `src/game/shop.js`: shelves, the till, the cashier. `src/game/living.js`: TV channels, music/TV volume, the balcony sash, the guys' pranks. `src/game/pc.js`: Oleg's PC (upgrader, КС duel).
 - `src/world/apartment.js` builds walls with openings, wallpaper linings (only where a wall face exists), floors, windows, and the hinged doors (`doors.balcony/bath/entrance`).
 - `src/world/furniture.js`: each item is built in a local frame (u along the wall, v from the wall to the front, y up). Colliders come from layout footprints.
 - `docs/FACES.md` is the face-picture plan: an action shot per state (head + hands + props, like Kirill drinking), optional second frame for a 2-frame loop (`<who>_<action>[_2].png`), Qwen prompt, priorities.

@@ -3,6 +3,7 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { buildApartment } from './world/apartment.js';
 import { buildFurniture } from './world/furniture.js';
+import { buildOutside } from './world/outside.js';
 import { roomAt, START, DOORCAM, SPOTS, CENTER } from './world/layout.js';
 import { Game } from './game/game.js';
 import { Player } from './player.js';
@@ -41,12 +42,17 @@ const furn = buildFurniture();
 scene.add(apt.group, furn.group);
 
 const game = new Game({ scene, apt, furn, sfx: audio.sfx, voices: audio.voices });
-const player = new Player(camera, [...apt.colliders, ...furn.colliders]);
+const outside = buildOutside(); // stairwell down, the yard, "Продукты 24"
+scene.add(outside.group);
+apt.ceiling.add(outside.ceiling);
+const player = new Player(camera, [...apt.colliders, ...furn.colliders, ...outside.colliders]);
+player.floorAt = outside.heightAt;
 scene.add(camera); // the first-person hands hang off the camera
 const hands = createViewmodel(camera);
 let mirror = null; // created at boot, once the head style is known
 let phoneBob = 0;
 const fx = makeFX(renderer, scene, camera);
+game.attachOutside(outside);
 const hud = createHUD({ onBuy: (cart) => game.buyCart(cart) });
 // close-up hands-on scenes (pelmeni): the mouse is free, the camera flies in, the world slows down
 // close-ups where the camera flies to something and the mouse works on it: the pelmeni pot, the PC
@@ -437,7 +443,7 @@ function frame(now) {
     if (hudT <= 0 || target !== hud.lastTarget) {
       hudT = 0.1;
       hud.lastTarget = target;
-      hud.update(game, { roomName: roomAt(player.x, player.z)?.name, target, actions: currentActions });
+      hud.update(game, { roomName: roomAt(player.x, player.z)?.name ?? outside.zoneName(player.x, player.z), target, actions: currentActions });
     }
     audio.setMusic(game.state.music && !game.hushed); // the music goes quiet while someone knocks
     audio.voices.update([player.x, player.z]);

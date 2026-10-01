@@ -69,12 +69,15 @@ export class Player {
       this.walkT += dt * (speed / 3.1);
     }
     // dancing: bouncing to the beat, head going side to side
+    // stairs: the floor under his feet (outside.js), followed smoothly
+    const floor = this.floorAt ? this.floorAt(this.x, this.z) : 0;
+    this.floorY = this.floorY === undefined ? floor : this.floorY + (floor - this.floorY) * Math.min(1, dt * 12);
     const bob = (moving ? Math.sin(this.walkT * 8) * 0.03 : 0) + (dance > 0 ? Math.abs(Math.sin(this.t * 5.2)) * 0.09 : 0);
     const groove = dance > 0 ? Math.sin(this.t * 2.6) * 0.12 : 0;
     const sway = d * d;
     this.camera.position.set(
       this.x + Math.sin(this.t * 0.9) * sway * 0.08,
-      (this.eye ?? EYE) - ((this.eye ?? EYE) - 0.32) * fall + bob + Math.sin(this.t * 1.4) * sway * 0.04,
+      this.floorY + (this.eye ?? EYE) - ((this.eye ?? EYE) - 0.32) * fall + bob + Math.sin(this.t * 1.4) * sway * 0.04,
       this.z + Math.cos(this.t * 0.7) * sway * 0.08,
     );
     this.camera.rotation.set(
