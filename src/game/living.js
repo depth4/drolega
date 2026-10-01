@@ -282,10 +282,7 @@ export class Living {
     const free = g.friends.filter((f) => !f.problem && !f.fallen && !f.event && f.mode !== 'walk');
     if (!free.length) return;
     const f = free[Math.floor(Math.random() * free.length)];
-    const say = (text) => {
-      f.figure.say(text, 2.5);
-      f.figure.play('shout');
-    };
+    const say = () => f.figure.play('shout');
     const opts = [];
     if (!st.music) opts.push('musicOn');
     else if (st.volume < 3) opts.push('musicUp', 'musicUp');
@@ -300,7 +297,7 @@ export class Living {
     } else if (pick === 'musicUp') {
       st.volume += 1;
       say(st.volume === 3 ? 'НА МАКСИМУМ!' : 'Погромче сделаю');
-      g.toast(`${f.name} выкрутил музыку погромче (${st.volume}/3) — соседи услышат`, 'warn', 'Зал');
+      g.toast(`${f.name} выкрутил музыку погромче (${st.volume}/3)`, 'warn', 'Зал');
     } else if (pick === 'tvOn') {
       this.setTV(true);
       this.switchCh(Math.floor(Math.random() * CHANNELS.length));

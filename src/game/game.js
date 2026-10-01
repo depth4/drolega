@@ -84,7 +84,7 @@ class Inventory {
     // outside the flat there's no fridge to put it back in: in the shop it goes back on the shelf
     if (this.game.outside && roomAt(...this.game.olegPos) == null) {
       if (this.game.shop?.putBack(item)) return this.game.toast('Положил обратно на полку', 'info');
-      if (['beer', 'vodka', 'food', 'pelmeni'].includes(item)) return this.game.toast('Выкинул. Ну такое', 'warn');
+      if (['beer', 'vodka', 'food', 'pelmeni'].includes(item)) return this.game.toast('Выкинул', 'warn');
     }
     if (item === 'pelmeni') return void this.game.state.fridge.pelmeni++;
     if (item === 'toy') this.game.dropToy();
@@ -158,10 +158,6 @@ export class Game {
       this.aloneT = (this.aloneT ?? 0) + dt;
       if (this.aloneT > V.missAfter) {
         for (const f of this.friends) if (!f.problem) f.fun = clamp(f.fun - V.missDrain * dt);
-        if (this.toastOnce('miss', 'Пацаны: «Олег, ты где? Иди к нам!»', 'warn', 30)) {
-          const f = this.friends.find((x) => !x.problem);
-          f?.figure.say('Олег, ты где там?!', 2.5);
-        }
       }
     }
   }
@@ -175,7 +171,6 @@ export class Game {
     c.forEach((f, i) => {
       f.fun = clamp(f.fun + V.cheers);
       f.figure.play('laugh');
-      if (i === 0) f.figure.say(['Будем!', 'Давай, за нас!', 'Чин-чин!', 'Олег красава'][Math.floor(Math.random() * 4)], 2);
     });
     this.sfx.ding();
   }
@@ -183,7 +178,7 @@ export class Game {
   // T with nothing to do: dance (only with music on)
   olegDance() {
     const V = TUNE.vibe, o = this.oleg;
-    if (!this.state.music) return this.toastOnce('danceNoMusic', 'Без музыки не танцуется — врубай музон', 'info', 4);
+    if (!this.state.music) return;
     if (o.dance > 0 || !this.spend(V.danceCost)) return;
     o.dance = V.dance;
     o.fun = clamp(o.fun + V.danceFun);
@@ -191,7 +186,6 @@ export class Game {
       f.fun = clamp(f.fun + V.danceFun);
       f.figure.play('laugh');
     }
-    this.company()[0]?.figure.say('Олег отжигает!', 2);
   }
 
   // ---------- drunk physics ----------
@@ -206,7 +200,6 @@ export class Game {
       watchers.forEach((w, i) => {
         w.fun = clamp(w.fun + C.laugh);
         w.figure.play('laugh');
-        if (i === 0) w.figure.say(['Ахахахах', 'Красава!', 'Лёг отдохнуть', 'Пол держишь?'][Math.floor(Math.random() * 4)], 2);
       });
       if (near(...this.olegPos, 6)) this.oleg.fun = clamp(this.oleg.fun + 2);
     }
@@ -293,7 +286,6 @@ export class Game {
         f.shoveCd = t + 1.2;
         // Oleg's momentum goes into his balance: a walk-by sways him, a run into a drunk one floors him
         f.push(Math.atan2(dx, dz), sp * (0.6 + 1.2 * f.drunk / 100), 'shove');
-        if (sp > 1.5) f.figure.say(['Э, аккуратнее', 'Куда прёшь?', 'Полегче, бро', 'Олег, ты чё?!'][Math.floor(Math.random() * 4)], 1.5);
       }
     }
   }
@@ -328,7 +320,6 @@ export class Game {
     near.forEach((w, i) => {
       w.fun = clamp(w.fun + TUNE.chaos.laugh);
       w.figure.play('laugh');
-      if (i === 0) w.figure.say('Олег, ахахаха, вставай!', 2);
     });
   }
 
@@ -498,7 +489,6 @@ export class Game {
     this.doors.entrance.setOpen(false);
     this.lastToy = -1;
     this.respawnToy();
-    this.alert(`Ночь ${n}. Пацаны пришли. Продержись до 06:00`, null, 'info');
   }
 
   // how close the neighbours are to knocking, 0..1

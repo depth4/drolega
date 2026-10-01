@@ -74,8 +74,7 @@ export class Shop {
     g.state.stats.spent += sum;
     this.unpaid = [];
     g.sfx.ding();
-    this.cashier.say('Пакет нужен? Ну и ладно.', 2.5);
-    g.toast(`Оплатил ${sum} ₽. Неси домой, пока там всё не разнесли`, 'good');
+    g.toast(`Оплатил ${sum} ₽`, 'good');
   }
 
   update(dt, olegPos) {
@@ -87,7 +86,6 @@ export class Shop {
       const [x, z] = olegPos, d = this.out.shopDoor;
       if (Math.hypot(x - (d.x0 + d.x1) / 2, z - (d.z0 + d.z1) / 2) < 1.3) {
         this.nagT = 4;
-        this.cashier.say('Эй! А платить кто будет?!', 2.5);
         this.game.toast(`Сначала оплати на кассе: ${this.total()} ₽`, 'warn');
       }
     }

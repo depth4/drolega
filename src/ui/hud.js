@@ -134,10 +134,6 @@ export function createHUD({ onBuy }) {
       el.ofun.style.width = `${game.oleg.fun}%`;
       el.ofun.parentElement.classList.toggle('low', game.oleg.fun < 25);
       el.othirst.hidden = game.oleg.thirst < TUNE.olegThirst.from; // Oleg wants a drink
-      const vibe = $('ovibe');
-      vibe.hidden = !el.othirst.hidden;
-      vibe.textContent = game.oleg.dance > 0.1 ? 'отжигает' : game.vibe ? `тусит с пацанами ×${game.vibe}` : (game.aloneT ?? 0) > TUNE.vibe.missAfter ? 'один, пацаны скучают' : 'один';
-      vibe.classList.toggle('on', !!game.vibe || game.oleg.dance > 0.1);
 
       // who needs Oleg: name, fun, and a "!" when something is wrong (what exactly — look at him)
       const row = (name, fun, bad) => `<div class="row ${bad ? 'bad' : ''}"><span class="name">${esc(name)}</span><span class="badge ${bad ? '' : 'off'}">!</span>${bar(fun)}</div>`;

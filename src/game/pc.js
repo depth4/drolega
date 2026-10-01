@@ -149,7 +149,6 @@ export class PC {
     if (f.problem?.id === 'gamble') f.clearProblem(true);
     f.fun = clamp(f.fun - 6);
     f.pcBan = this.game.state.t + 30; // not straight back
-    f.figure.say(Math.random() < 0.5 ? 'Да блин, я почти нож выбил!' : 'Олег, ну ещё один спин!', 2.5);
     f.endActivity();
   }
 
@@ -227,7 +226,6 @@ export class PC {
       for (const f of watchers) {
         f.fun = clamp(f.fun + P.winFun);
         f.figure.play('shout');
-        f.figure.say(['ЕЕЕЕЕ!', 'ЗАНЁС!', 'Красава!', `${goal.price} рублей!`][Math.floor(Math.random() * 4)], 2);
       }
       if (!s.by) g.oleg.fun = clamp(g.oleg.fun + P.winFun);
       g.toast(`${s.by ? s.by.name : 'Олег'} выбил ${goal.name}!`, 'good');
@@ -235,7 +233,6 @@ export class PC {
       for (const f of watchers) {
         f.fun = clamp(f.fun + (f === s.by ? -2 : P.loseFun));
         f.figure.play(f === s.by ? 'shout' : 'laugh');
-        f.figure.say(f === s.by ? 'СУКААА' : ['Ахахаха', 'Лудик', 'Минус скин'][Math.floor(Math.random() * 3)], 1.8);
       }
     }
   }
@@ -252,7 +249,6 @@ export class PC {
     if (!this.skins.length || Math.random() < 0.3) {
       const cheap = SKINS.map((s, i) => i).filter((i) => SKINS[i].price <= 300 && SKINS[i].price <= g.state.money);
       if (!cheap.length) {
-        f.figure.say('Олег, у тебя бабки кончились', 2.5);
         f.endActivity();
         return;
       }
@@ -327,15 +323,12 @@ export class PC {
         g.oleg.fun = clamp(g.oleg.fun + P.csWin);
         for (const f of watchers) {
           f.fun = clamp(f.fun + P.csWatch);
-          f.figure.say('Олег тащер!', 2);
           f.figure.play('shout');
         }
-        g.toast('Олег затащил дуэль!', 'good');
       } else {
         g.oleg.fun = clamp(g.oleg.fun - 4);
         for (const f of watchers) {
           f.fun = clamp(f.fun + 3);
-          f.figure.say('Ахаха, бот', 2);
           f.figure.play('laugh');
         }
       }

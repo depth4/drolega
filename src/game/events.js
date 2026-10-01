@@ -55,7 +55,6 @@ export class PartyEvents {
   startToast() {
     const g = this.game, guys = this.free();
     const host = guys[Math.floor(Math.random() * guys.length)];
-    host.figure.say('Пацаны, ТОСТ! Олег, иди сюда!', 3);
     host.figure.play('shout');
     this.toast = { left: TUNE.events.toastWindow, guys, drank: false };
     guys.forEach((f, i) => {
@@ -86,7 +85,6 @@ export class PartyEvents {
       for (const f of k.guys) {
         f.fun = clamp(f.fun + E.toastFun);
         f.figure.play('drink');
-        f.figure.say(TOAST_LINES[Math.floor(Math.random() * TOAST_LINES.length)], 2);
         const tb = g.state.table;
         if (tb.vodka > 0) tb.vodka -= 1;
         else if (tb.beer > 0) tb.beer -= 1;
@@ -94,14 +92,11 @@ export class PartyEvents {
       }
       g.oleg.fun = clamp(g.oleg.fun + E.toastOlegFun);
       g.olegHelped();
-      g.toast('Выпили за Олега! Все довольны', 'good');
       this.endToast();
     } else if (k.left <= 0) {
       for (const f of k.guys) {
         f.fun = clamp(f.fun - E.toastMiss);
-        f.figure.say('Олег, ну ты чё, не с нами?', 2.5);
       }
-      g.toast('Тост без Олега. Пацаны обиделись', 'bad');
       this.endToast();
     }
   }
@@ -135,7 +130,6 @@ export class PartyEvents {
       f.event = 'quarrel';
       f.setProblem({ id: 'quarrel', text: `срётся с ${o.name === 'Лёха' ? 'Лёхой' : o.name === 'Темыч' ? 'Темычем' : o.name === 'Кирилл' ? 'Кириллом' : 'Алексеем'} — встань между ними`, short: 'СРУТСЯ', drain: 1.2, actions: () => [] }, true);
     }
-    a.figure.say('Э, слышь! Ты чё сказал?!', 2.5);
     a.figure.play('shout');
   }
 
@@ -180,7 +174,6 @@ export class PartyEvents {
     if (q.lineT <= 0) {
       q.lineT = rand(1.3, 2.1);
       const f = q.side ? b : a;
-      f.figure.say(QUARREL_LINES[q.side][Math.floor(Math.random() * 4)], 1.8);
       f.figure.play('shout');
       q.side ^= 1;
     }
@@ -189,17 +182,13 @@ export class PartyEvents {
     if (q.sep >= E.separate) {
       a.fun = clamp(a.fun + 6);
       b.fun = clamp(b.fun + 6);
-      a.figure.say('Ладно, ладно…', 2);
-      b.figure.say('Да всё, всё, норм', 2);
       g.olegHelped();
-      g.toast('Разнял. Пацаны остыли', 'good');
       this.endQuarrel();
       return;
     }
     q.left -= dt;
     if (q.left <= 0) {
       q.fight = 2.5;
-      a.figure.say('Ну всё, сука!', 1.5);
       g.alert(`${a.name} и ${b.name} дерутся!`, a.room?.name);
     }
   }
@@ -263,7 +252,7 @@ export class PartyEvents {
     if (Math.random() < dt * (4 + F.size * 10)) particles.puff(this.fireMesh.position.clone().setY(0.6 + F.size * 0.5), new THREE.Vector3(rand(-0.1, 0.1), 0.5, rand(-0.1, 0.1)), { color: '#3a3330', size0: 0.15, size1: 0.9 + F.size, life: 2.2, opacity: 0.5 });
     if (F.full > E.fireBurnout) {
       g.state.hut -= E.fireDisaster;
-      g.alert('Балкон выгорел. Соседи в шоке', 'Балкон');
+      g.alert('Балкон выгорел', 'Балкон');
       this.putOut(false);
     }
   }
@@ -278,7 +267,6 @@ export class PartyEvents {
       id: 'fire', text: 'спалил балкон! Ведро у ванны: набери воды из лейки и плесни на огонь', short: 'ПОЖАР', drain: 3,
       actions: () => [],
     }, true);
-    kirill.figure.say('ОЛЕГ! ПОЖАР! БЛЯ!', 3);
     kirill.figure.play('shout');
   }
 
@@ -303,8 +291,6 @@ export class PartyEvents {
       kirill.clearProblem(byOleg);
       if (byOleg) {
         kirill.fun = clamp(kirill.fun + 10);
-        kirill.figure.say('Фух… Шашлык спасён!', 2.5);
-        g.toast('Пожар потушен', 'good');
       }
     }
   }

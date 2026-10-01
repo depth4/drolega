@@ -203,7 +203,6 @@ export class Interactions {
         sleeper.clearProblem(true);
         sleeper.endActivity();
         sleeper.figure.play('shout');
-        sleeper.figure.say('А? Чё? Я не сплю!', 2);
       }
       hud = { label: input.down ? 'Расталкиваешь… (тряси мышью — быстрее)' : 'Зажми ЛКМ — растолкать', progress: Math.min(1, p.wake) };
     }

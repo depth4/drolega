@@ -148,7 +148,6 @@ export const CHARS = {
       const L = TUNE.lyokha;
       if (!f.wasted && !f.warned && f.drunk >= L.wastedAt - L.warnBefore) {
         f.warned = true;
-        f.figure.say('Пацаны… мне чёт хреново…', 3);
         g.toast('Лёха зеленеет — накорми его (еда в руках, E на нём), пока не поплыл', 'warn', f.room?.name);
       }
       if (f.warned && f.drunk < L.wastedAt - L.warnBefore - 10) f.warned = false;
@@ -222,7 +221,6 @@ const PROBLEMS = {
       if (kind === right) {
         f.fun += 20;
         f.clearProblem(true);
-        g.toast('Алексей успокоился', 'good');
       } else {
         tried.add(kind);
         f.fun -= 5;
@@ -301,7 +299,6 @@ const PROBLEMS = {
       tick() {
         if (g.doors.balcony.open) {
           f.clearProblem(true);
-          g.toast('Кирилл отдышался', 'good');
         }
       },
       actions: () => [],
@@ -618,14 +615,11 @@ export class Friend extends Walker {
         this.fun += 10;
         this.wet = 0;
         this.clearProblem(true);
-        this.game.toast(`${this.name} ожил после ледяного душа`, 'good');
         this.game.sfx.splash();
         this.endActivity();
-        this.figure.say('Бррр! Всё, всё, я живой!', 2.5);
-      } else if (Math.random() < dt * 0.8) this.figure.say(Math.random() < 0.5 ? 'Бррр!' : 'А-а-а, холодно!', 1.2);
+      }
     } else {
       this.fun -= 4 * dt;
-      if (Math.random() < dt * 0.8) this.figure.say('Эй, ты чё творишь?!', 1.4);
     }
   }
 
@@ -715,7 +709,6 @@ export class Friend extends Walker {
         b.vp *= keepV;
         b.vr *= keepV;
       }
-      if (m > B.stepAt * 1.8 && Math.random() < 0.4) this.figure.say(['Опа-опа', 'Воу-воу', 'Стоять!', 'Держусь'][Math.floor(Math.random() * 4)], 1.2);
     }
     if (m < 0.05) this.lastPush = null;
     this.figure.setLean(b.p, b.r);
@@ -736,7 +729,6 @@ export class Friend extends Walker {
     const g = this.game;
     this.fallen = { t: 0, rel: dir - this.heading, lie: rand(1.2, 2.2) + (this.drunk / 100) * 2.5, why };
     this.figure.play('flail');
-    this.figure.say(['Бля!', 'Ой, сука!', 'Ааа!', 'Опа…'][Math.floor(Math.random() * 4)], 1.6);
     this.fun = clamp(this.fun - 3);
     g.someoneFell(this, why);
     return true;
@@ -771,7 +763,6 @@ export class Friend extends Walker {
       if (Math.hypot(pd.position.x - this.pos[0], pd.position.z - this.pos[1]) > 0.35) continue;
       this.slipCd = g.state.t + 6;
       this.push(this.heading + Math.PI + rand(-0.6, 0.6), 1.6 + 2 * (this.drunk / 100), 'slip');
-      this.figure.say('Кто тут наблевал, бля?!', 2.2);
       return;
     }
   }
@@ -1078,7 +1069,6 @@ export class Cat extends Walker {
       this.spot = null;
       this.y = 0;
       this.ready = rand(0.3, 0.8);
-      g.toastOnce('catToy', 'Кот погнался за мышкой', 'good', 8);
     }
     this.running = false;
     if (this.playLeft > 0) {
@@ -1207,7 +1197,7 @@ export class Cat extends Walker {
     this.spot = { id: 'floor', node: this.node, p: [...this.pos], pose: null };
     if (hid && g.toyLoose) {
       g.respawnToy();
-      g.toast('Кот наигрался и загнал мышку куда-то под мебель', 'info');
+      g.toast('Кот закатил мышку под мебель', 'info');
     }
   }
 
