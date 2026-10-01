@@ -134,7 +134,7 @@ export function buildOutside() {
   for (const [x, z] of [[2, -3.2], [12.5, -3.2]]) {
     pbox(group, x - 0.06, x + 0.06, STREET, STREET + 4.2, z - 0.06, z + 0.06, railMat);
     pbox(group, x - 0.25, x + 0.25, STREET + 4.1, STREET + 4.25, z - 0.15, z + 0.15, new THREE.MeshBasicMaterial({ color: '#ffd59a' }));
-    const l = new THREE.PointLight('#ffb866', 7, 14, 1.4);
+    const l = new THREE.PointLight('#ffb866', 18, 10, 1.4); // short range: no shadows, so it must not reach into the flat
     const [wx, wz] = P.pt(x, z);
     l.position.set(wx, STREET + 4, wz);
     group.add(l);

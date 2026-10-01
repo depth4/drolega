@@ -2,7 +2,7 @@
 // Every point light in the scene costs every lit pixel, and the flat, stairwell,
 // street and shop together have more than a dozen. The scene keeps its lamps
 // (hidden, so the shaders never see them); each frame the pool copies the ones
-// nearest to the viewer, fading a lamp in and out when it gains or loses a slot.
+// nearest to the viewer (and in front of him), fading a lamp in and out when it gains or loses a slot.
 // The light count never changes, so nothing recompiles mid-game.
 import * as THREE from 'three';
 
@@ -16,7 +16,8 @@ export function createLightPool(scene, size = 6) {
     return { l, src: null, w: 0 };
   });
   let lamps = [], scanIn = 0, first = true;
-  const p = new THREE.Vector3();
+  const p = new THREE.Vector3(), sphere = new THREE.Sphere(), m = new THREE.Matrix4();
+  const views = [];
 
   const scan = () => {
     const found = [];
@@ -34,18 +35,28 @@ export function createLightPool(scene, size = 6) {
 
   return {
     scan,
-    // views: world positions the picture is seen from (main camera, door camera)
-    update(dt, views) {
+    // cams: the cameras the picture is seen from (main camera, door camera)
+    update(dt, cams) {
       if ((scanIn -= dt) <= 0) { scan(); scanIn = 2; }
+      cams.forEach((c, i) => {
+        const v = (views[i] ??= { pos: new THREE.Vector3(), frustum: new THREE.Frustum() });
+        c.updateMatrixWorld();
+        c.getWorldPosition(v.pos);
+        v.frustum.setFromProjectionMatrix(m.multiplyMatrices(c.projectionMatrix, c.matrixWorldInverse));
+      });
+      views.length = cams.length;
       const score = new Map();
       for (const o of lamps) {
         if (o.intensity <= 0 || !shown(o)) continue;
         o.getWorldPosition(p);
         let best = 0;
         for (const v of views) {
-          const d = p.distanceTo(v);
+          const d = p.distanceTo(v.pos);
           if (o.distance > 0 && d > o.distance + 8) continue;
-          best = Math.max(best, o.intensity / Math.pow(1 + d, 1.6));
+          // a lamp whose light can't reach anything on screen counts for much less
+          sphere.set(p, o.distance > 0 ? o.distance * 0.7 : 5);
+          const seen = v.frustum.intersectsSphere(sphere) ? 1 : 0.25;
+          best = Math.max(best, (seen * o.intensity) / Math.pow(1 + d, 1.6));
         }
         if (best > 0) score.set(o, best);
       }

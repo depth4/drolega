@@ -3,6 +3,7 @@
 import * as THREE from 'three';
 import { H, ROOMS, WALLS, DIAG_WALLS, BALCONY, CENTER, BOUNDS, CAT_SPOTS, roomAt } from './layout.js';
 import * as T from './textures.js';
+import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 
 
 export const mat = (color, extra = {}) => new THREE.MeshStandardMaterial({ color, roughness: 0.85, ...extra });
@@ -196,6 +197,7 @@ export function buildApartment() {
     // the rest of the building under the flat, so it doesn't float in the dollhouse view
     const mass = mat('#3a3834');
     group.add(new THREE.Mesh(boxGeo(B.x0, B.x1, -9, -0.25, B.z0, B.z1), mass));
+    buildFacade(group, ceiling);
     // stairwell landing slab + mass (the landing is on the entrance side)
     const land = ROOMS.find((r) => r.id === 'landing').rects[0];
     group.add(new THREE.Mesh(boxGeo(land.x0 - 0.2, land.x1 + 0.2, -0.25, 0, land.z0 - 0.2, land.z1 + 0.2), mat('#4a3f36')));
@@ -204,6 +206,99 @@ export function buildApartment() {
 
   group.add(ceiling);
   return { group, ceiling, colliders, lights, doors };
+}
+
+// The rest of the khrushchevka, seen from the yard: a window under and over each of Oleg's,
+// some lit, and the neighbours' balconies stacked on his. Floors 3-5 and the roof hang on
+// the ceiling group, so the dollhouse view (ceiling hidden) still looks into the flat.
+function buildFacade(group, ceiling) {
+  const north = WALLS.find((w) => w.id === 'north');
+  const FZ = north.z0 - 0.108; // the street facade's face (outside.js puts a 0.08 plan-m skin there)
+  const Y = -2.8; // their floor
+  const frame = mat('#d9d4c6');
+  // everything is merged per (group, material) at the end: hundreds of little boxes, a dozen draw calls
+  const buckets = new Map();
+  const put = (parent, geo, m) => {
+    const key = parent === group ? 0 : 1;
+    if (!buckets.has(m)) buckets.set(m, [[], []]);
+    buckets.get(m)[key].push(geo);
+  };
+  const dark = new THREE.MeshBasicMaterial({ color: '#0b0f16' });
+  const lit = (seed) => {
+    const c = document.createElement('canvas');
+    c.width = 64;
+    c.height = 64;
+    const g = c.getContext('2d');
+    const grad = g.createLinearGradient(0, 0, 0, 64);
+    grad.addColorStop(0, seed % 2 ? '#e9b56a' : '#d9c79a');
+    grad.addColorStop(1, seed % 2 ? '#a8652c' : '#8f7a52');
+    g.fillStyle = grad;
+    g.fillRect(0, 0, 64, 64);
+    g.fillStyle = seed % 2 ? 'rgba(120,40,30,0.75)' : 'rgba(60,70,90,0.7)'; // curtains
+    g.fillRect(0, 0, 14 + (seed % 3) * 4, 64);
+    g.fillRect(50 - (seed % 2) * 6, 0, 20, 64);
+    const t = new THREE.CanvasTexture(c);
+    t.colorSpace = THREE.SRGBColorSpace;
+    return new THREE.MeshBasicMaterial({ map: t });
+  };
+  let n = 0;
+  const windows = (parent, Y) => {
+    for (const o of north.openings) {
+      const [a, b] = o.at;
+      const y0 = Y + (o.kind === 'balcony' ? 0 : o.bottom), y1 = Y + o.top;
+      const f = 0.06;
+      put(parent, boxGeo(a, b, y0, y1, FZ - 0.005, FZ), [1, 3, 6, 8, 13].includes(n) ? lit(n) : dark);
+      for (const [x0, x1, yy0, yy1] of [[a, a + f, y0, y1], [b - f, b, y0, y1], [a, b, y1 - f, y1], [a, b, y0, y0 + f], [(a + b) / 2 - f / 2, (a + b) / 2 + f / 2, y0, y1]]) {
+        put(parent, boxGeo(x0, x1, yy0, yy1, FZ - 0.04, FZ), frame);
+      }
+      if (o.kind !== 'balcony') put(parent, boxGeo(a - 0.05, b + 0.05, y0 - 0.05, y0, FZ - 0.12, FZ), sill);
+      n++;
+    }
+  };
+  const sill = mat('#7d7a74');
+  // a neighbours' balcony: slab, rail panels, glazing up to the next slab
+  const { x0, x1, z0 } = BALCONY;
+  const panel = mat('#5f6b5c', { roughness: 0.9 });
+  const slab = mat('#7a7670');
+  const glass = new THREE.MeshStandardMaterial({ color: '#1a2230', roughness: 0.1, metalness: 0.3, transparent: true, opacity: 0.55 });
+  const balcony = (parent, Y, top) => {
+    put(parent, boxGeo(x0, x1, Y - 0.15, Y, z0, FZ), slab);
+    put(parent, boxGeo(x0, x1, Y, Y + 1, z0, z0 + 0.04), panel);
+    put(parent, boxGeo(x0, x0 + 0.04, Y, Y + 1, z0, FZ), panel);
+    put(parent, boxGeo(x1 - 0.04, x1, Y, Y + 1, z0, FZ), panel);
+    put(parent, boxGeo(x0 + 0.04, x1 - 0.04, Y + 1, top, z0 + 0.01, z0 + 0.02), glass);
+    const k = Math.round((x1 - x0) / 0.9);
+    for (let i = 0; i <= k; i++) {
+      const x = x0 + ((x1 - x0) * i) / k;
+      put(parent, boxGeo(Math.max(x0, x - 0.03), Math.min(x1, x + 0.03), Y + 1, top, z0, z0 + 0.05), frame);
+    }
+    put(parent, boxGeo(x0, x1, Y + 1, Y + 1.06, z0 - 0.02, z0 + 0.06), frame);
+    put(parent, boxGeo(x0, x1, top - 0.06, top, z0, FZ), frame);
+  };
+  windows(group, Y);
+  balcony(group, Y, -0.3);
+  // floors 3-5 over the flat and the stairwell, then a flat roof with a parapet
+  const FLOOR = 2.8, top = FLOOR * 4 + 0.3, sx0 = -3.9;
+  const wall = new THREE.MeshStandardMaterial({ map: T.concrete(), color: '#8f8a80', roughness: 1 });
+  const upper = boxGeo(sx0, BOUNDS.x1, H + 0.02, top, FZ, BOUNDS.z1);
+  worldUV(upper, 1);
+  put(ceiling, upper, wall);
+  put(ceiling, boxGeo(sx0 - 0.05, BOUNDS.x1 + 0.05, top, top + 0.5, FZ - 0.05, BOUNDS.z1), mat('#55524c'));
+  for (let f = 1; f <= 3; f++) {
+    windows(ceiling, f * FLOOR);
+    balcony(ceiling, f * FLOOR, f * FLOOR + FLOOR - 0.3);
+  }
+  // stairwell windows between the floors
+  for (let f = 0; f <= 3; f++) {
+    const y = f * FLOOR + 1.4, a = -2.8, b = -1.6;
+    if (y < H) continue;
+    put(ceiling, boxGeo(a, b, y, y + 1, FZ - 0.005, FZ), f % 2 ? lit(2) : dark);
+    put(ceiling, boxGeo((a + b) / 2 - 0.03, (a + b) / 2 + 0.03, y, y + 1, FZ - 0.04, FZ), frame);
+  }
+  for (const [m, [low, high]] of buckets) {
+    if (low.length) group.add(new THREE.Mesh(mergeGeometries(low.map((g) => g.index ? g.toNonIndexed() : g)), m));
+    if (high.length) ceiling.add(new THREE.Mesh(mergeGeometries(high.map((g) => g.index ? g.toNonIndexed() : g)), m));
+  }
 }
 
 function polyFloor(poly) {

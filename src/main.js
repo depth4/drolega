@@ -481,9 +481,7 @@ function frame(now) {
   blackFx += ((mode === 'play' && game.oleg.blackout > 0 ? 1 : 0) - blackFx) * Math.min(1, dt * 3);
   fx.set(time, drunkFx, blackFx);
 
-  const views = [(mode === 'orbit' ? orbitCam : camera).getWorldPosition(new THREE.Vector3())];
-  if (mode === 'play' && hud.camRect()) views.push(doorCam.position);
-  lightPool.update(dt, views);
+  lightPool.update(dt, mode === 'play' && hud.camRect() ? [camera, doorCam] : [mode === 'orbit' ? orbitCam : camera]);
   if (mode === 'orbit') renderer.render(scene, orbitCam);
   else fx.render();
   if (snapRequested) {
