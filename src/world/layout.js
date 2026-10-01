@@ -210,8 +210,8 @@ const PLAN_PAINTINGS = [
 const PLAN_VISITOR = [9.05, 4.95]; // where visitors stand on the landing
 const PLAN_DOORCAM = { pos: [10.45, 2.15, 4.95], look: [8.3, 1.2, 4.95] };
 
-// Where Oleg starts: in the hall by the front door, facing the living room.
-const PLAN_START = { x: 7.3, z: 4.6, yaw: Math.PI / 2 };
+// Where Oleg starts: in the living room by the door, the party in front of him.
+const PLAN_START = { x: 3.25, z: 4.9, yaw: -0.3 };
 
 // ---------- world-space exports (scaled + mirrored) ----------
 
