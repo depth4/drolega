@@ -364,7 +364,7 @@ const ray = new THREE.Raycaster();
 ray.far = 2.4;
 ray.camera = camera;
 const center = new THREE.Vector2(0, 0);
-const pickRoots = [apt.group, furn.group, game.dynamic];
+const pickRoots = [apt.group, furn.group, outside.group, game.dynamic]; // the stairwell, yard and shop too: their walls block, the shelves are targets
 function visibleChain(o) {
   for (; o; o = o.parent) if (!o.visible) return false;
   return true;

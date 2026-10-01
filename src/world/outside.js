@@ -49,7 +49,7 @@ export function buildOutside() {
     pbox(group, x0, x1, -1.1, H, z0, z1, paintHigh);
     wall(x0, x1, z0, z1, extra);
   };
-  sw(10.7, 10.9, -0.42, TOP[1]); // the outer side wall
+  sw(10.7, 10.9, 0, TOP[1]); // the outer side wall, behind the front wall (overlapping boxes flicker)
   // against the flat: above its floor the flat's own wall is there already (two walls in one place flicker)
   pbox(group, 8.3, 8.5, STREET, -1.1, END[0], TOP[1], paintLow);
   pbox(group, 8.3, 8.5, -1.1, 0, END[0], TOP[1], paintHigh);
@@ -67,7 +67,9 @@ export function buildOutside() {
   ceiling.add(pbox(new THREE.Group(), 8.5, 10.9, H, H + 0.15, -0.42, TOP[1], mat('#bdb9ad')));
 
   // ---- stairs: steps you see, a ramp the camera follows (heightAt)
-  const lane = (a) => (a ? [SX[0], LANE - 0.05] : [LANE + 0.05, SX[1]]);
+  // steps and slabs go 3 cm into the side walls: an end face lying exactly on a wall face flickers in stripes
+  const IN = 0.03;
+  const lane = (a) => (a ? [SX[0] - IN, LANE - 0.05] : [LANE + 0.05, SX[1] + IN]);
   // from z0 (height y0) to z1 (height y1)
   const flight = (laneA, z0, z1, y0, y1, n) => {
     const [x0, x1] = lane(laneA);
@@ -77,14 +79,14 @@ export function buildOutside() {
       pbox(group, x0, x1, top - 0.3, top, Math.min(a, b), Math.max(a, b), stepMat);
     }
   };
-  const slab = (z0, z1, y) => pbox(group, SX[0], SX[1], y - 0.25, y, z0, z1, concrete, 1);
+  const slab = (z0, z1, y) => pbox(group, SX[0] - IN, SX[1] + IN, y - 0.25, y, z0, z1, concrete, 1);
   slab(TOP[0], TOP[1], 0); // his landing
   flight(true, FL[1], FL[0], 0, -1.4, 10); // towards the front, down to the half landing
-  slab(END[0], END[1], -1.4);
+  slab(END[0] - IN, END[1], -1.4); // into the front wall, same reason
   flight(false, FL[0], FL[1], -1.4, L1, 10); // back to the 1st floor
   slab(TOP[0], TOP[1], L1);
   flight(true, FL[1], FL[0], L1, STREET, 8); // the short one down to the door
-  pbox(group, SX[0], SX[1], STREET - 0.2, STREET, END[0], END[1], new THREE.MeshStandardMaterial({ map: T.floorTile(), roughness: 0.8 }), 1);
+  pbox(group, SX[0] - IN, SX[1] + IN, STREET - 0.2, STREET, END[0] - IN, END[1], new THREE.MeshStandardMaterial({ map: T.floorTile(), roughness: 0.8 }), 1);
   // balusters and a hand rail along each flight (the collider stops you hopping between flights)
   wall(LANE - 0.05, LANE + 0.05, FL[0], FL[1]);
   for (const [y0, y1] of [[-1.4, 0], [-1.4, L1], [STREET, L1]]) { // height at FL[0] .. at FL[1]
@@ -119,7 +121,7 @@ export function buildOutside() {
   // ---- the yard in front of the house
   pbox(group, FRONT.x0, FRONT.x1, STREET - 0.3, STREET, FRONT.z0, FRONT.z1, mat('#2b2c2e', { roughness: 1 }));
   pbox(group, FRONT.x0, FRONT.x1, STREET, STREET + 0.06, -1.9, FRONT.z1, mat('#55534f', { roughness: 1 })); // sidewalk
-  pbox(group, -0.4, 8.3, STREET, -0.25, -0.5, -0.42, facade, 1); // the house below the flat's windows
+  pbox(group, -0.4, 8.5, STREET, -0.25, -0.5, -0.42, facade, 1); // the house below the flat's windows, up to the stairwell
   wall(-0.4, 8.3, -0.5, -0.42, { floor: [-9, -2] }); // street level only (the balcony door is right above)
   const fence = mat('#3b4a3a', { metalness: 0.3 });
   for (const [x0, x1, z0, z1, streetOnly] of [

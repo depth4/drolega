@@ -32,8 +32,14 @@ export class Shop {
     this.cashier.root.rotation.y = 0; // faces the door (towards the building, +z)
     this.cashier.root.traverse((o) => (o.userData.target = {
       name: 'Продавщица',
-      info: () => (this.unpaid.length ? `К оплате: ${this.total()} ₽` : 'Бери с полок, плати тут'),
-      actions: () => (this.unpaid.length ? [{ key: 'E', text: `Оплатить ${this.total()} ₽`, run: () => this.pay() }] : []),
+      info: () => (this.unpaid.length ? `К оплате: ${this.total()} ₽` : 'Бери с полок или проси бутылку с витрины за ней'),
+      actions: () =>
+        this.unpaid.length
+          ? [{ key: 'E', text: `Оплатить ${this.total()} ₽`, run: () => this.pay() }]
+          : [
+              { key: 'E', text: `Пиво, пожалуйста (${this.price('beer')} ₽)`, run: () => this.buyNow('beer') },
+              { key: 'R', text: `Водку (${this.price('vodka')} ₽)`, run: () => this.buyNow('vodka') },
+            ],
     }));
     game.dynamic.add(this.cashier.root);
     this.nagT = 0;
@@ -65,6 +71,16 @@ export class Shop {
     if (i < 0) return false;
     this.unpaid.splice(i, 1);
     return true;
+  }
+
+  // straight from the shelf behind her: paid on the spot
+  buyNow(id) {
+    const g = this.game, price = this.price(id);
+    if (g.state.money < price) return g.toast(`Не хватает: нужно ${price} ₽`, 'bad');
+    if (!g.inv.add(GOODS[id].item, 1)) return;
+    g.state.money -= price;
+    g.state.stats.spent += price;
+    g.sfx.ding();
   }
 
   pay() {
