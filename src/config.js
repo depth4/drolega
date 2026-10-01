@@ -86,6 +86,12 @@ export const TUNE = {
   // fun for the guy spinning (per second) and for the ones watching a win / a loss; КС duel
   pc: { edge: 0.9, sell: 0.85, playFun: 0.8, winFun: 10, loseFun: 3, csKills: 6, csWin: 15, csWatch: 10, watchFun: 0.7 },
 
+  // drunk physics: bodies push each other apart; running into a drunk guy knocks him over (knockOver:
+  // speed/5 x (0.35 + drunk) above it); two drunks (drunk sum > bumpDrunk) bumping may fall (bumpFall);
+  // puddles are slippery (slip + drunk/200); a fall makes the others laugh (laugh fun each);
+  // Oleg drunk above olegTripAt trips while running (olegTrip per second at 100%), slips on puddles (olegSlip)
+  chaos: { radius: 0.24, bumpDrunk: 90, bumpFall: 0.35, knockOver: 0.5, slip: 0.45, laugh: 3, olegTripAt: 45, olegTrip: 0.3, olegSlip: 0.35 },
+
   // party events (which ones run on a night: NIGHTS[n].events)
   events: {
     every: [28, 45], // seconds between events (x night pace)

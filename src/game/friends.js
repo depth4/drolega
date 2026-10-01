@@ -436,6 +436,7 @@ export class Friend extends Walker {
 
   // what a photo of him right now would show (null = nothing worth a shot)
   photoMoment() {
+    if (this.fallen) return { cat: 'fall', caption: `${this.name} наебнулся` };
     const loop = this.animLoop();
     const n = this.name;
     const byLoop = {
@@ -463,6 +464,7 @@ export class Friend extends Walker {
   // what the body is doing right now (clip names from world/anim.js)
   animLoop() {
     if (this.debugLoop !== undefined) return this.debugLoop; // console testing: f.debugLoop = 'puke'
+    if (this.fallen) return this.fallen.t > 0.45 && !this.fallen.up ? 'fallen' : null;
     if (this.wetT > 0 && this.figure.pose !== 'lie') return 'shiver';
     const pid = this.problem?.id;
     if (this.mode === 'walk' || this.follow) return pid === 'smash' ? 'smashWalk' : pid === 'puke' || pid === 'led' ? 'holdMouth' : null;
@@ -506,7 +508,7 @@ export class Friend extends Walker {
     this.wetT = Math.max(0, (this.wetT ?? 0) - dt);
     this.wet = Math.max(0, (this.wet ?? 0) - dt * 0.03);
     this.shake = Math.max(0, (this.shake ?? 0) - dt * 2.5);
-    const walk = (this.mode === 'walk' && this.game.talk?.friend !== this) || (this.follow && this.walkingNow);
+    const walk = !this.fallen && ((this.mode === 'walk' && this.game.talk?.friend !== this) || (this.follow && this.walkingNow));
     const n = Math.sin(this.t * 1.3 + this.seed) * 0.6 + Math.sin(this.t * 2.9 + this.seed * 2) * 0.4;
     const lat = walk ? 0.17 * d * n : 0;
     const jig = this.shake * Math.sin(this.t * 45) * 0.06; // being shaken awake
@@ -661,6 +663,51 @@ export class Friend extends Walker {
     this.walkingNow = true;
   }
 
+  // knocked over, slipped, or just too drunk: tips over around his feet, lies there, gets up
+  fall(dir = this.heading, why = 'drunk') {
+    if (this.fallen || this.figure.pose !== 'stand' || this.follow) return false;
+    const g = this.game;
+    this.fallen = { t: 0, rel: dir - this.heading, lie: rand(1.2, 2.2) + (this.drunk / 100) * 2.5, why };
+    this.figure.play('flail');
+    this.figure.say(['Бля!', 'Ой, сука!', 'Ааа!', 'Опа…'][Math.floor(Math.random() * 4)], 1.6);
+    this.fun = clamp(this.fun - 3);
+    g.someoneFell(this, why);
+    return true;
+  }
+
+  fallTick(dt) {
+    const F = this.fallen;
+    F.t += dt;
+    const down = 0.45, up = 0.7;
+    let k;
+    if (F.t < down) k = (F.t / down) ** 2; // gravity
+    else if (F.t < down + F.lie) k = 1;
+    else if (F.t < down + F.lie + up) {
+      if (!F.up) {
+        F.up = true;
+        this.figure.play('getup');
+      }
+      k = 1 - (F.t - down - F.lie) / up;
+    } else {
+      this.fallen = null;
+      this.figure.setFall(0);
+      return;
+    }
+    this.figure.setFall(k, F.rel);
+  }
+
+  // walking through a puddle: slippery, more so when drunk
+  slipCheck() {
+    const g = this.game;
+    if ((this.slipCd ?? 0) > g.state.t) return;
+    for (const pd of g.puddles) {
+      if (Math.hypot(pd.position.x - this.pos[0], pd.position.z - this.pos[1]) > 0.35) continue;
+      this.slipCd = g.state.t + 6;
+      if (Math.random() < TUNE.chaos.slip + this.drunk / 200 && this.fall(this.heading, 'slip')) this.figure.say('Кто тут наблевал, бля?!', 2.2);
+      return;
+    }
+  }
+
   // thirst and hunger grow; when they get strong he drops what he's doing and heads for the table
   needs(dt) {
     const N = TUNE.needs;
@@ -697,7 +744,8 @@ export class Friend extends Walker {
     }
 
     const talking = g.talk?.friend === this;
-    if (this.follow) this.stepFollow(dt);
+    if (this.fallen) this.fallTick(dt);
+    else if (this.follow) this.stepFollow(dt);
     else if (talking) {
       const [ox, oz] = g.olegPos;
       this.heading = Math.atan2(ox - this.pos[0], oz - this.pos[1]);
@@ -708,8 +756,13 @@ export class Friend extends Walker {
       if (this.lurch > 0) this.lurch -= dt;
       else if (d > 0.4 && chance(0.12 * d, dt)) {
         this.lurch = 0.8;
-        this.figure.play('stumble');
-      } else this.stepWalk(dt * (1 - 0.35 * d * (0.5 + 0.5 * Math.sin(this.t * 1.9))));
+        // very drunk: a stumble can end on the floor
+        if (d > 0.7 && Math.random() < 0.35) this.fall(this.heading + rand(-1, 1), 'drunk');
+        else this.figure.play('stumble');
+      } else {
+        this.stepWalk(dt * (1 - 0.35 * d * (0.5 + 0.5 * Math.sin(this.t * 1.9))));
+        this.slipCheck();
+      }
     } else if (this.event) {
       // at a party event (toast, quarrel): stays where it put him, see events.js
     } else if (this.activity) this.tickActivity(dt);

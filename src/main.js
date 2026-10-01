@@ -384,7 +384,9 @@ function frame(now) {
         lock();
       }
       // the phone is in his hand: he can keep walking with it (WASD), the mouse is on the screen
-      player.update(dt, { drunk: game.oleg.drunk, canMove: !(game.oleg.blackout > 0) && !listening });
+      const px = player.x, pz = player.z;
+      player.update(dt, { drunk: game.oleg.drunk, canMove: !(game.oleg.blackout > 0) && !listening, fall: game.olegFallK });
+      game.olegSpeed = Math.hypot(player.x - px, player.z - pz) / Math.max(dt, 1e-4);
     }
     focusRay.setFromCamera(focusActive() ? mouseNdc : center, camera);
     game.cooking.update(dt, { ray: focusRay.ray, down: use.down, dx: use.fx, dy: use.fy });
@@ -398,7 +400,7 @@ function frame(now) {
       moving: !listening && !mini.active && ['KeyW', 'KeyA', 'KeyS', 'KeyD'].some((c) => k.has(c)),
       speed: k.has('ShiftLeft') || k.has('ShiftRight') ? 1.5 : 1,
       drunk: game.oleg.drunk,
-      visible: !phoneOpen && !mini.active && !photoMode && !(game.oleg.blackout > 0),
+      visible: !phoneOpen && !mini.active && !photoMode && !(game.oleg.blackout > 0) && !game.oleg.fall,
       yaw: player.yaw,
       pitch: player.pitch,
     });

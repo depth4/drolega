@@ -161,6 +161,15 @@ function base(p, c) {
 }
 
 const LOOPS = {
+  // on the floor after falling over: arms and legs all over the place, twitching
+  fallen(p, c) {
+    for (const [i, s] of SIDES.entries()) {
+      Object.assign(p.arms[i], { x: -2.4 + 0.25 * Math.sin(c.T * 3 + i), z: s * (0.9 + 0.2 * Math.sin(c.T * 2.3 + i)), elbow: -0.5 });
+      Object.assign(p.legs[i], { x: -0.3 * (i ? 1 : 0.2), z: s * 0.25, knee: i ? 0.9 : 0.2 });
+    }
+    p.neck.x = -0.4 + 0.15 * Math.sin(c.T * 1.7);
+    p.neck.y = 0.4 * Math.sin(c.T * 0.9);
+  },
   // Alexey glued to the vodka bottle
   chug(p, c) {
     const a = p.arms[0];
@@ -380,6 +389,34 @@ const SHOTS = {
       const k = Math.sin((Math.PI * u) / 0.35);
       p.spine.x += 0.35 * k * w;
       p.neck.x += 0.2 * k * w;
+    },
+  },
+  // losing balance on the way down: windmilling arms, a leg kicking out
+  flail: {
+    dur: 0.6,
+    run(p, c, w, u) {
+      for (const [i, s] of SIDES.entries()) {
+        mix(p.arms[i], 'x', -2.2 + 1.4 * Math.sin(c.T * 22 + i * Math.PI), w);
+        mix(p.arms[i], 'z', s * (0.8 + 0.4 * Math.sin(c.T * 17)), w);
+        mix(p.arms[i], 'elbow', -0.3, w);
+      }
+      mix(p.legs[0], 'x', -0.9 * Math.sin((Math.PI * u) / 0.6), w);
+      mix(p.legs[1], 'knee', 0.6, w);
+      mix(p.neck, 'x', -0.5, w);
+    },
+  },
+  // getting up off the floor: push up with the arms, a knee under him
+  getup: {
+    dur: 0.7,
+    run(p, c, w, u) {
+      const k = 1 - u / 0.7;
+      for (const [i, s] of SIDES.entries()) {
+        mix(p.arms[i], 'x', -1.2 * k, w);
+        mix(p.arms[i], 'z', s * 0.4 * k, w);
+      }
+      mix(p.legs[0], 'x', -1.2 * k, w);
+      mix(p.legs[0], 'knee', 1.4 * k, w);
+      mix(p.spine, 'x', 0.5 * k, w);
     },
   },
   stumble: {

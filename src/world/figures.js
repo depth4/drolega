@@ -141,8 +141,10 @@ function makeBoxPerson(opts) {
   const { name, shirt, pants = '#2b2f3a', skin = '#e2b594', hair = '#3b2a1e', label = true } = opts;
   const who = opts.faceId;
   const root = new THREE.Group();
+  const tilt = new THREE.Group(); // falling over: the whole body tips around the feet (name tags stay upright)
+  root.add(tilt);
   const body = new THREE.Group();
-  root.add(body);
+  tilt.add(body);
   const m = { shirt: mat(shirt, { roughness: 0.9 }), pants: mat(pants, { roughness: 0.9 }), skin: mat(skin, { roughness: 0.7 }), hair: mat(hair) };
   const sk = skinMaterials(who); // clothes from a skin sheet, if this guy has one
   const rig = createRig(body, { m, sk, style: opts.style });
@@ -247,6 +249,12 @@ function makeBoxPerson(opts) {
   return {
     root, body, arms, rig, ...tags,
     setFace,
+    // k: 0 standing .. 1 flat on the floor; dir: where he falls, relative to where he faces (radians)
+    setFall(k, dir = 0) {
+      const a = k * Math.PI * 0.5;
+      tilt.rotation.set(Math.cos(dir) * a, 0, -Math.sin(dir) * a);
+      tilt.position.y = 0.13 * k; // the body has some thickness when lying
+    },
     setLoop: (name, o) => rig.setLoop(name, o),
     play: (name, o) => rig.play(name, o),
     get busy() {

@@ -43,9 +43,11 @@ export class Player {
     return this.colliders.some((c) => c.enabled !== false && Player.hits(c, x, z) && !Player.hits(c, this.x, this.z));
   }
 
-  update(dt, { drunk = 0, canMove = true } = {}) {
+  // fall: 0 standing .. 1 lying on the floor (Oleg tripped / slipped)
+  update(dt, { drunk = 0, canMove = true, fall = 0 } = {}) {
     this.t += dt;
     const k = this.keys;
+    if (fall > 0) canMove = false;
     const f = canMove ? (k.has('KeyW') ? 1 : 0) - (k.has('KeyS') ? 1 : 0) : 0;
     const s = canMove ? (k.has('KeyD') ? 1 : 0) - (k.has('KeyA') ? 1 : 0) : 0;
     const d = drunk / 100;
@@ -70,13 +72,13 @@ export class Player {
     const sway = d * d;
     this.camera.position.set(
       this.x + Math.sin(this.t * 0.9) * sway * 0.08,
-      (this.eye ?? EYE) + bob + Math.sin(this.t * 1.4) * sway * 0.04,
+      (this.eye ?? EYE) - ((this.eye ?? EYE) - 0.32) * fall + bob + Math.sin(this.t * 1.4) * sway * 0.04,
       this.z + Math.cos(this.t * 0.7) * sway * 0.08,
     );
     this.camera.rotation.set(
-      this.pitch + Math.sin(this.t * 1.1) * sway * 0.08,
+      this.pitch * (1 - fall) + fall * 0.35 + Math.sin(this.t * 1.1) * sway * 0.08,
       this.yaw + Math.sin(this.t * 0.6) * sway * 0.12,
-      Math.sin(this.t * 0.8) * sway * 0.15,
+      Math.sin(this.t * 0.8) * sway * 0.15 + fall * 1.25, // lying on his side
     );
   }
 }

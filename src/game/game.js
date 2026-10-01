@@ -119,6 +119,161 @@ export class Game {
     this.pc = new PC(this);
   }
 
+  // ---------- drunk physics ----------
+
+  // somebody hit the floor: the others laugh (that's the party), the table may lose a bottle
+  someoneFell(f, why) {
+    const st = this.state, C = TUNE.chaos;
+    const near = (x, z, r) => Math.hypot(x - f.pos[0], z - f.pos[1]) < r;
+    if (st.t > (this.laughCd ?? 0)) {
+      this.laughCd = st.t + 3;
+      const watchers = this.friends.filter((w) => w !== f && !w.fallen && near(w.pos[0], w.pos[1], 5));
+      watchers.forEach((w, i) => {
+        w.fun = clamp(w.fun + C.laugh);
+        w.figure.play('laugh');
+        if (i === 0) w.figure.say(['Ахахахах', 'Красава!', 'Лёг отдохнуть', 'Пол держишь?'][Math.floor(Math.random() * 4)], 2);
+      });
+      if (near(...this.olegPos, 6)) this.oleg.fun = clamp(this.oleg.fun + 2);
+    }
+    const t = this.furn.items.partyTable;
+    if (f.pos[0] > t.x0 - 0.6 && f.pos[0] < t.x1 + 0.6 && f.pos[1] > t.z0 - 0.6 && f.pos[1] < t.z1 + 0.6 && this.tableBooze() > 0) {
+      if (st.table.beer > 0) st.table.beer -= 1;
+      else st.table.vodka -= 1;
+      this.sfx.crash();
+      this.toast(`${f.name} рухнул на стол — бутылка вдребезги`, 'bad', 'Зал');
+    } else this.sfx.pat();
+  }
+
+  bodyBlocked(x, z) {
+    const r = 0.16;
+    for (const c of [...this.apt.colliders, ...this.furn.colliders]) {
+      if (c.enabled === false) continue;
+      if (c.seg) {
+        const [ax, az, bx, bz] = c.seg;
+        const vx = bx - ax, vz = bz - az;
+        const t = Math.max(0, Math.min(1, ((x - ax) * vx + (z - az) * vz) / (vx * vx + vz * vz)));
+        if (Math.hypot(x - ax - vx * t, z - az - vz * t) < c.r + r) return true;
+      } else if (x > c.x0 - r && x < c.x1 + r && z > c.z0 - r && z < c.z1 + r) return true;
+    }
+    return false;
+  }
+
+  shove(f, dx, dz) {
+    const x = f.pos[0] + dx, z = f.pos[1] + dz;
+    if (!this.bodyBlocked(x, z) || this.bodyBlocked(...f.pos)) f.pos = [x, z];
+  }
+
+  // people don't walk through each other: overlapping bodies push apart; running into a drunk guy
+  // knocks him over; two drunks walking into each other may go down
+  bumps() {
+    const C = TUNE.chaos, t = this.state.t, R2 = C.radius * 2;
+    const ppl = this.friends.filter((f) => !f.fallen && f.figure.pose === 'stand' && !f.follow && f.figure.root.visible);
+    for (let i = 0; i < ppl.length; i++) {
+      for (let j = i + 1; j < ppl.length; j++) {
+        const a = ppl[i], b = ppl[j];
+        let dx = b.pos[0] - a.pos[0], dz = b.pos[1] - a.pos[1];
+        const d = Math.hypot(dx, dz);
+        if (d >= R2 || d < 1e-4) continue;
+        dx /= d;
+        dz /= d;
+        const push = (R2 - d) / 2;
+        this.shove(a, -dx * push, -dz * push);
+        this.shove(b, dx * push, dz * push);
+        if ((a.mode === 'walk' || b.mode === 'walk') && a.drunk + b.drunk > C.bumpDrunk && (a.bumpCd ?? 0) < t && (b.bumpCd ?? 0) < t) {
+          a.bumpCd = b.bumpCd = t + 4;
+          if (Math.random() < C.bumpFall) {
+            const v = Math.random() < 0.5 ? a : b, s = v === a ? -1 : 1;
+            v.fall(Math.atan2(dx * s, dz * s), 'bump');
+          } else (Math.random() < 0.5 ? a : b).figure.play('stumble');
+        }
+      }
+    }
+    // Oleg walks into people: they get pushed; at a run a drunk one goes flying
+    const [ox, oz] = this.olegPos, sp = this.olegSpeed ?? 0, RO = C.radius + 0.17;
+    if (this.oleg.fall) return;
+    for (const f of ppl) {
+      let dx = f.pos[0] - ox, dz = f.pos[1] - oz;
+      const d = Math.hypot(dx, dz);
+      if (d >= RO || d < 1e-4) continue;
+      dx /= d;
+      dz /= d;
+      this.shove(f, dx * (RO - d), dz * (RO - d));
+      if (sp > 0.8 && (f.shoveCd ?? 0) < t) {
+        f.shoveCd = t + 1.2;
+        const hit = (sp / 5) * (0.35 + f.drunk / 100);
+        if (hit > C.knockOver && f.fall(Math.atan2(dx, dz), 'shove')) {
+          f.fun = clamp(f.fun - 4);
+          setTimeout(() => f.figure.say('Олег, ты чё?!', 1.8), 700);
+        } else if (hit > 0.2) {
+          f.figure.play('stumble');
+          f.figure.say(['Э, аккуратнее', 'Куда прёшь?', 'Полегче, бро'][Math.floor(Math.random() * 3)], 1.5);
+        }
+      }
+    }
+  }
+
+  // Oleg hits the floor: whatever is in his hands goes too
+  olegFall(why) {
+    const o = this.oleg;
+    if (o.fall || o.blackout > 0) return;
+    o.fall = { t: 0, dur: 2 };
+    this.sfx.pat();
+    const it = this.inv.selectedItem();
+    const msg = why === 'slip' ? 'Олег поскользнулся на блевоте' : 'Олег наебнулся';
+    if (it === 'beer' || it === 'vodka') {
+      this.inv.consume();
+      this.sfx.crash();
+      this.toast(`${msg} — бутылка вдребезги`, 'bad');
+    } else if (it === 'food') {
+      this.inv.consume();
+      this.toast(`${msg} — еда на полу`, 'bad');
+    } else if (it === 'water') {
+      this.inv.swap('water', 'bucket');
+      this.sfx.splash();
+      this.toast(`${msg} и облился из ведра`, 'bad');
+    } else if (it === 'cat') {
+      this.inv.remove('cat');
+      this.dropCat();
+      this.toast(`${msg}, кот удрал`, 'bad');
+    } else this.toast(msg, 'bad');
+    o.fun = clamp(o.fun - 3);
+    o.energy = Math.max(0, o.energy - 10);
+    const near = this.friends.filter((w) => !w.fallen && Math.hypot(w.pos[0] - this.olegPos[0], w.pos[1] - this.olegPos[1]) < 6);
+    near.forEach((w, i) => {
+      w.fun = clamp(w.fun + TUNE.chaos.laugh);
+      w.figure.play('laugh');
+      if (i === 0) w.figure.say('Олег, ахахаха, вставай!', 2);
+    });
+  }
+
+  olegPhysics(dt) {
+    const o = this.oleg, C = TUNE.chaos, sp = this.olegSpeed ?? 0;
+    if (o.fall) {
+      o.fall.t += dt;
+      if (o.fall.t >= o.fall.dur) o.fall = null;
+      return;
+    }
+    // drunk and running: the feet don't keep up
+    if (sp > 4 && o.drunk > C.olegTripAt && Math.random() < ((o.drunk - C.olegTripAt) / (100 - C.olegTripAt)) * C.olegTrip * dt) this.olegFall('trip');
+    // puddles
+    if (sp > 1 && (this.olegSlipCd ?? 0) < this.state.t) {
+      const [x, z] = this.olegPos;
+      if (this.puddles.some((p) => Math.hypot(p.position.x - x, p.position.z - z) < 0.3)) {
+        this.olegSlipCd = this.state.t + 3;
+        if (Math.random() < C.olegSlip + o.drunk / 300 + (sp > 4 ? 0.2 : 0)) this.olegFall('slip');
+      }
+    }
+  }
+
+  // 0 standing .. 1 on the floor (for the camera)
+  get olegFallK() {
+    const f = this.oleg.fall;
+    if (!f) return 0;
+    if (f.t < 0.35) return (f.t / 0.35) ** 2;
+    if (f.t < f.dur - 0.6) return 1;
+    return Math.max(0, 1 - (f.t - (f.dur - 0.6)) / 0.6);
+  }
+
   // ---------- the bucket (for the balcony fire) ----------
 
   buildBucket() {
@@ -215,7 +370,7 @@ export class Game {
       photos: [],
       photoCats: new Set(),
     };
-    this.oleg = { fun: 80, drunk: 0, blackout: 0, energy: TUNE.energy.max, thirst: 0 };
+    this.oleg = { fun: 80, drunk: 0, blackout: 0, energy: TUNE.energy.max, thirst: 0, fall: null };
     this.inv = new Inventory(this);
     this.toasts = [];
     this.toastKeys = {};
@@ -993,6 +1148,8 @@ export class Game {
     }
 
     for (const f of this.friends) f.update(dt);
+    this.bumps();
+    this.olegPhysics(dt);
     particles.update(dt);
     this.updateToy(dt);
     this.events.update(dt);
